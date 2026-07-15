@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="th">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -17,7 +17,7 @@
     var theme = savedTheme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
     document.documentElement.setAttribute('data-theme', theme);
     var savedLang = localStorage.getItem('cardify-lang');
-    document.documentElement.setAttribute('lang', savedLang || 'th');
+    document.documentElement.setAttribute('lang', savedLang || 'en');
   } catch (e) {}
 })();
 </script>
@@ -178,6 +178,12 @@
   </section>
 
 </main>
+
+<footer class="app-footer">
+  <img src="img/logo-black.png" alt="Cardify" class="app-footer__logo app-footer__logo--light">
+  <img src="img/logo-white.png" alt="Cardify" class="app-footer__logo app-footer__logo--dark">
+  <p class="app-footer__contact">Contact: <a href="mailto:preerapat.nrwn@gmail.com">preerapat.nrwn@gmail.com</a></p>
+</footer>
 
 <script type="module" src="js/app.js"></script>
 </body>

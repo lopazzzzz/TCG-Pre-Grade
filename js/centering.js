@@ -44,6 +44,23 @@ function detectEdgeFraction(imageData, width, height, side) {
     profile[p] = sum / count;
   }
 
+  // Windowed gradient (average of a few samples ahead vs. a few behind)
+  // rather than a single-pixel difference — a real border-to-artwork edge
+  // is a sustained transition, while holo/foil textures and print noise
+  // create single-pixel luminance spikes that a naive adjacent-pixel diff
+  // can mistake for the border. Averaging over a small window smooths out
+  // that noise while still catching genuine edges at this resolution.
+  const WINDOW = 3;
+  function windowedGradient(pos) {
+    let before = 0, beforeN = 0, after = 0, afterN = 0;
+    for (let k = 1; k <= WINDOW; k++) {
+      if (pos - k >= 0) { before += profile[pos - k]; beforeN++; }
+      if (pos + k < scanLength) { after += profile[pos + k]; afterN++; }
+    }
+    if (!beforeN || !afterN) return 0;
+    return Math.abs(after / afterN - before / beforeN);
+  }
+
   const from = side === 'right' || side === 'bottom';
   let bestPos = Math.floor(scanLength * searchMin);
   let bestGrad = -1;
@@ -55,16 +72,14 @@ function detectEdgeFraction(imageData, width, height, side) {
   // first transition that clears a confident threshold, and only fall back
   // to the single strongest transition in range if nothing clears it (e.g.
   // a low-contrast/pastel border).
-  const STRONG_GRADIENT = 18; // luminance units between adjacent sample positions
+  const STRONG_GRADIENT = 22; // luminance units, windowed
   let firstStrongPos = null;
 
   const lo = Math.floor(scanLength * searchMin);
   const hi = Math.floor(scanLength * searchMax);
   for (let p = lo + 1; p < hi; p++) {
     const pos = from ? scanLength - 1 - p : p;
-    const prev = from ? pos + 1 : pos - 1;
-    if (prev < 0 || prev >= scanLength) continue;
-    const grad = Math.abs(profile[pos] - profile[prev]);
+    const grad = windowedGradient(pos);
     if (grad > bestGrad) {
       bestGrad = grad;
       bestPos = pos;
@@ -136,7 +151,7 @@ export function attachBorderEditor(canvas, initialBorders, onChange) {
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
     ctx.save();
-    ctx.strokeStyle = '#ffce45';
+    ctx.strokeStyle = '#00e5ff';
     ctx.lineWidth = 2;
     ctx.setLineDash([6, 4]);
 

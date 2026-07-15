@@ -42,7 +42,7 @@ function drawCenteringGuides(ctx, rect, borders) {
   const y1 = rect.y + borders.top * rect.h;
   const y2 = rect.y + borders.bottom * rect.h;
   ctx.save();
-  ctx.strokeStyle = 'rgba(255,206,69,0.95)';
+  ctx.strokeStyle = 'rgba(0,229,255,0.95)';
   ctx.lineWidth = 2;
   ctx.setLineDash([6, 4]);
   [x1, x2].forEach((x) => {

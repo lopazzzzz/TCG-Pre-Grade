@@ -1,6 +1,7 @@
 const { SYSTEM_PROMPT, buildUserText, parseGradingResponse, computeCompanyEstimates } = require('./lib/gradingPrompt');
+const { logScan } = require('./lib/scanLog');
 
-const GEMINI_MODEL = 'gemini-2.5-flash-lite';
+const GEMINI_MODEL = 'gemini-3.1-flash-lite';
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
 const IMAGE_LABELS = [
@@ -88,6 +89,14 @@ exports.handler = async (event) => {
       surface: graded.surface_score,
       edges: graded.edges_score,
     });
+
+    // Log every completed scan for the admin dashboard. Best-effort: a
+    // logging failure should never break the user-facing analysis result.
+    try {
+      await logScan({ event, game, cardName, setName, cardNumber, centeringFrontRatio, centeringBackRatio, graded, estimates, images });
+    } catch (logErr) {
+      console.error('scan log write failed', logErr);
+    }
 
     return {
       statusCode: 200,

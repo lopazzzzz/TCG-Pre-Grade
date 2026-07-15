@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cardify — Admin</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="img/favicon.png">
+<script>
+(function () {
+  try {
+    var saved = localStorage.getItem('tcg-theme');
+    var theme = saved || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    document.documentElement.setAttribute('data-theme', theme);
+  } catch (e) {}
+})();
+</script>
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .admin-login { max-width: 360px; margin: 15vh auto 0; }
+  .admin-login input { width: 100%; margin-bottom: 12px; }
+  .admin-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .admin-list { display: flex; flex-direction: column; gap: 10px; }
+  .admin-row {
+    display: flex; align-items: center; gap: 14px;
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 12px 14px; background: var(--surface-alt); cursor: pointer;
+    text-align: left; width: 100%; font-family: inherit;
+  }
+  .admin-row__main { flex: 1; min-width: 0; }
+  .admin-row__title { font-weight: 700; font-size: 0.92rem; }
+  .admin-row__meta { font-size: 0.78rem; color: var(--text-muted); margin-top: 2px; }
+  .admin-row__scores { display: flex; gap: 10px; font-size: 0.82rem; color: var(--text-muted); flex-wrap: wrap; }
+  .admin-row__scores b { color: var(--text); }
+  .admin-modal {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.55);
+    display: none; align-items: flex-start; justify-content: center;
+    padding: 24px 12px; overflow-y: auto; z-index: 50;
+  }
+  .admin-modal.is-open { display: flex; }
+  .admin-modal__panel {
+    background: var(--panel-bg); border-radius: var(--radius); padding: 22px;
+    max-width: 700px; width: 100%; position: relative; box-shadow: var(--shadow-md);
+  }
+  .admin-modal__close {
+    position: absolute; top: 12px; right: 16px; border: none; background: none;
+    font-size: 1.6rem; cursor: pointer; color: var(--text-muted);
+  }
+  .admin-detail__images { display: flex; gap: 10px; margin-bottom: 14px; }
+  .admin-detail__images img { width: 50%; border-radius: var(--radius-sm); object-fit: contain; background: #000; }
+</style>
+</head>
+<body>
+<header class="app-header">
+  <div class="app-header__title">
+    <img src="img/logo-black.png" alt="Cardify" class="app-header__logo app-header__logo--light">
+    <img src="img/logo-white.png" alt="Cardify" class="app-header__logo app-header__logo--dark">
+  </div>
+  <nav class="app-header__nav">
+    <span class="pill-toggle" style="cursor:default;">ADMIN</span>
+    <button type="button" id="theme-toggle" class="icon-toggle" aria-label="Toggle dark mode">🌙</button>
+  </nav>
+</header>
+
+<main class="app-main">
+
+  <section class="panel admin-login" id="login-panel">
+    <h2 class="panel__title">Admin Login</h2>
+    <input type="password" id="password-input" placeholder="Password" autocomplete="current-password">
+    <button type="button" class="btn-primary" id="login-btn" style="width:100%">Log in</button>
+    <p class="error" id="login-error" hidden></p>
+  </section>
+
+  <section class="panel" id="dashboard-panel" hidden>
+    <div class="admin-toolbar">
+      <h2 class="panel__title" style="margin:0">Scan Log</h2>
+      <button type="button" class="btn-secondary btn-small" id="logout-btn">Log out</button>
+    </div>
+    <div id="admin-list" class="admin-list"></div>
+    <p class="empty-state" id="admin-empty" style="display:none">No scans logged yet.</p>
+  </section>
+
+</main>
+
+<div id="detail-modal" class="admin-modal">
+  <div class="admin-modal__panel">
+    <button type="button" class="admin-modal__close" id="detail-close">&times;</button>
+    <div id="detail-body"></div>
+  </div>
+</div>
+
+<script type="module" src="js/admin.js"></script>
+</body>
+</html>

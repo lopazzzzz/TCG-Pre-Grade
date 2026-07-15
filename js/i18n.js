@@ -36,10 +36,10 @@ export const translations = {
     contrast: 'คอนทราสต์',
     exposure: 'Exposure',
 
-    step6_title: 'วิเคราะห์ด้วย AI',
-    notice_title: '⚠️ อ่านก่อนกด Analyze',
+    step6_title: 'ส่งข้อมูล',
+    notice_title: '⚠️ อ่านก่อนกด Submit',
     notice_body: 'เครื่องมือนี้ให้ผลประเมินเบื้องต้นเท่านั้น เพื่อใช้เป็นแนวทางก่อนส่งการ์ดไปเกรดกับบริษัทเกรดดิ้งจริง AI ถูกฝึกด้วยหลักเกณฑ์การให้คะแนนที่อ้างอิงจากมาตรฐานของ PSA, CGC, BGS และ TAG แต่ผลลัพธ์ไม่รับประกันว่าจะตรงกับเกรดจริงที่ได้รับ กรุณาใช้วิจารณญาณของคุณเอง ทางเราไม่รับผิดชอบต่อความเสียหายใดๆ ที่เกิดจากการตัดสินใจโดยอ้างอิงผลจากเครื่องมือนี้',
-    analyze_btn: 'วิเคราะห์ด้วย AI',
+    analyze_btn: 'ส่งข้อมูล',
     analyzing: 'กำลังวิเคราะห์… อาจใช้เวลาถึง ~20 วินาที',
     upload_both_error: 'กรุณาอัปโหลดรูปหน้าและหลังก่อน',
     save_image_btn: '💾 บันทึกเป็นรูปภาพ',
@@ -103,10 +103,10 @@ export const translations = {
     contrast: 'Contrast',
     exposure: 'Exposure',
 
-    step6_title: 'AI analysis',
-    notice_title: '⚠️ Please read before analyzing',
+    step6_title: 'Submit',
+    notice_title: '⚠️ Please read before submitting',
     notice_body: 'This tool provides a preliminary estimate only, meant as a guideline before submitting your card to an official grading company. The AI is trained on scoring logic modeled after the standards published by PSA, CGC, BGS, and TAG, but its results are not guaranteed to match your actual submission grade. Please use this tool at your own discretion — we accept no liability for any loss or damage arising from decisions made based on it.',
-    analyze_btn: 'Analyze with AI',
+    analyze_btn: 'Submit',
     analyzing: 'Analyzing… this can take up to ~20s',
     upload_both_error: 'Please upload both front and back photos first',
     save_image_btn: '💾 Save as Image',
@@ -138,12 +138,12 @@ export const translations = {
 };
 
 function currentLang() {
-  return document.documentElement.getAttribute('lang') === 'en' ? 'en' : 'th';
+  return document.documentElement.getAttribute('lang') === 'th' ? 'th' : 'en';
 }
 
 export function t(key) {
   const dict = translations[currentLang()];
-  return dict[key] !== undefined ? dict[key] : translations.th[key];
+  return dict[key] !== undefined ? dict[key] : translations.en[key];
 }
 
 function applyLang(lang) {

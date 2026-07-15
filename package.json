@@ -2,5 +2,8 @@
   "name": "cardify",
   "version": "1.0.0",
   "private": true,
-  "description": "Personal Pokemon / One Piece TCG pre-grading tool"
+  "description": "Personal Pokemon / One Piece TCG pre-grading tool",
+  "dependencies": {
+    "@netlify/blobs": "^8.1.0"
+  }
 }
