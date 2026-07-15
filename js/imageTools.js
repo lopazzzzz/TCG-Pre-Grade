@@ -1,21 +1,37 @@
 import { WORK_MAX_DIMENSION, CORNER_CROP_FRACTION } from './config.js';
 
-export function loadImageFromFile(file) {
+// Tries createImageBitmap first — it goes through the browser's native image
+// decoder more directly than an <img> + object URL, which some mobile
+// browsers (notably iOS Safari with HEIC photos from the library) handle
+// more reliably. Falls back to the classic <img> approach for browsers/
+// formats where that isn't available or fails silently.
+export async function loadImageFromFile(file) {
+  if (typeof createImageBitmap === 'function') {
+    try {
+      return await createImageBitmap(file);
+    } catch {
+      // fall through
+    }
+  }
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => resolve(img);
-    img.onerror = reject;
+    img.onerror = () => reject(new Error('unreadable image file'));
     img.src = URL.createObjectURL(file);
   });
 }
 
 // Draws the image onto a canvas at a capped working resolution, preserving
-// aspect ratio, and returns the canvas.
+// aspect ratio, and returns the canvas. `img` may be an HTMLImageElement or
+// an ImageBitmap (from loadImageFromFile above) — they expose the source
+// size under different property names.
 export function toWorkingCanvas(img, maxDim = WORK_MAX_DIMENSION) {
-  const scale = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight));
+  const srcWidth = img.naturalWidth || img.width;
+  const srcHeight = img.naturalHeight || img.height;
+  const scale = Math.min(1, maxDim / Math.max(srcWidth, srcHeight));
   const canvas = document.createElement('canvas');
-  canvas.width = Math.round(img.naturalWidth * scale);
-  canvas.height = Math.round(img.naturalHeight * scale);
+  canvas.width = Math.round(srcWidth * scale);
+  canvas.height = Math.round(srcHeight * scale);
   const ctx = canvas.getContext('2d');
   ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
   canvas._sourceImage = img;

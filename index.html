@@ -69,18 +69,24 @@
       </div>
     </div>
     <div class="upload-row">
-      <label class="upload-drop" id="front-drop">
-        <input type="file" accept="image/*" id="front-input" hidden>
-        <img class="upload-drop__preview" id="front-preview" hidden>
-        <span class="upload-drop__icon">📷</span>
-        <span class="upload-drop__label" data-i18n="front_photo">Front photo</span>
-      </label>
-      <label class="upload-drop" id="back-drop">
-        <input type="file" accept="image/*" id="back-input" hidden>
-        <img class="upload-drop__preview" id="back-preview" hidden>
-        <span class="upload-drop__icon">📷</span>
-        <span class="upload-drop__label" data-i18n="back_photo">Back photo</span>
-      </label>
+      <div class="upload-col">
+        <label class="upload-drop" id="front-drop">
+          <input type="file" accept="image/*" id="front-input" hidden>
+          <img class="upload-drop__preview" id="front-preview" hidden>
+          <span class="upload-drop__icon">📷</span>
+          <span class="upload-drop__label" data-i18n="front_photo">Front photo</span>
+        </label>
+        <p class="error upload-error" id="front-upload-error" hidden></p>
+      </div>
+      <div class="upload-col">
+        <label class="upload-drop" id="back-drop">
+          <input type="file" accept="image/*" id="back-input" hidden>
+          <img class="upload-drop__preview" id="back-preview" hidden>
+          <span class="upload-drop__icon">📷</span>
+          <span class="upload-drop__label" data-i18n="back_photo">Back photo</span>
+        </label>
+        <p class="error upload-error" id="back-upload-error" hidden></p>
+      </div>
     </div>
   </section>
 

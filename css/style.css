@@ -89,6 +89,10 @@ body {
   font-size: 0.8rem;
   font-weight: 700;
   letter-spacing: 0.03em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 .icon-toggle {
   width: 34px;
@@ -201,6 +205,8 @@ body {
 
 .upload-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 @media (max-width: 560px) { .upload-row { grid-template-columns: 1fr; } }
+.upload-col { min-width: 0; }
+.upload-error { margin: 6px 0 0; font-size: 0.8rem; }
 
 .upload-drop {
   position: relative;

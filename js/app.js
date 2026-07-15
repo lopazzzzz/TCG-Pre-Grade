@@ -30,10 +30,11 @@ document.querySelectorAll('.game-btn').forEach((btn) => {
 });
 
 // ---- Upload handling ----
-function setupUpload(side, dropId, inputId, previewId) {
+function setupUpload(side, dropId, inputId, previewId, errorId) {
   const drop = document.getElementById(dropId);
   const input = document.getElementById(inputId);
   const preview = document.getElementById(previewId);
+  const errorEl = document.getElementById(errorId);
 
   drop.addEventListener('click', () => input.click());
   drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('is-dragover'); });
@@ -41,30 +42,38 @@ function setupUpload(side, dropId, inputId, previewId) {
   drop.addEventListener('drop', (e) => {
     e.preventDefault();
     drop.classList.remove('is-dragover');
-    if (e.dataTransfer.files[0]) handleFile(side, e.dataTransfer.files[0], preview);
+    if (e.dataTransfer.files[0]) handleFile(side, e.dataTransfer.files[0], preview, errorEl);
   });
   input.addEventListener('change', () => {
-    if (input.files[0]) handleFile(side, input.files[0], preview);
+    if (input.files[0]) handleFile(side, input.files[0], preview, errorEl);
+    input.value = ''; // allow re-selecting the same file after a failed attempt
   });
 }
 
-async function handleFile(side, file, previewEl) {
-  const img = await loadImageFromFile(file);
-  const canvas = toWorkingCanvas(img);
-  state[side] = { original: canvas, canvas, ratios: null, alignEditor: null, centeringEditor: null };
+async function handleFile(side, file, previewEl, errorEl) {
+  errorEl.hidden = true;
+  errorEl.textContent = '';
+  try {
+    const img = await loadImageFromFile(file);
+    const canvas = toWorkingCanvas(img);
+    state[side] = { original: canvas, canvas, ratios: null, alignEditor: null, centeringEditor: null };
 
-  previewEl.src = canvasToDataUrl(canvas, 0.85);
-  previewEl.hidden = false;
+    previewEl.src = canvasToDataUrl(canvas, 0.85);
+    previewEl.hidden = false;
 
-  if (state.front && state.back) {
-    document.getElementById('panel-align').hidden = false;
-    setupAlign('front', 'front-align-canvas', 'front-align-reset-btn');
-    setupAlign('back', 'back-align-canvas', 'back-align-reset-btn');
+    if (state.front && state.back) {
+      document.getElementById('panel-align').hidden = false;
+      setupAlign('front', 'front-align-canvas', 'front-align-reset-btn');
+      setupAlign('back', 'back-align-canvas', 'back-align-reset-btn');
+    }
+  } catch (err) {
+    errorEl.textContent = t('upload_read_error');
+    errorEl.hidden = false;
   }
 }
 
-setupUpload('front', 'front-drop', 'front-input', 'front-preview');
-setupUpload('back', 'back-drop', 'back-input', 'back-preview');
+setupUpload('front', 'front-drop', 'front-input', 'front-preview', 'front-upload-error');
+setupUpload('back', 'back-drop', 'back-input', 'back-preview', 'back-upload-error');
 
 // ---- Align (perspective correction) ----
 function setupAlign(side, canvasId, resetBtnId) {
