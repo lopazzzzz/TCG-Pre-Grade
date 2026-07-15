@@ -1,6 +1,8 @@
 import { loadImageFromFile, toWorkingCanvas, canvasToDataUrl, generateCornerCrops, applyAdjustments, createCompareSlider } from './imageTools.js';
 import { autoDetectBorders, computeRatios, attachBorderEditor } from './centering.js';
-import { analyzeCard, saveCard, renderResultsDashboard } from './grading.js';
+import { defaultCorners, attachCornerPicker, warpQuadToRect } from './perspective.js';
+import { analyzeCard, renderResultsDashboard } from './grading.js';
+import { generateReportImage, downloadCanvasAsImage } from './report.js';
 import { initThemeToggle } from './theme.js';
 import { initDonateCopyButton } from './donate.js';
 
@@ -9,7 +11,7 @@ initDonateCopyButton();
 
 const state = {
   game: 'pokemon',
-  front: null, // { canvas, ratios }
+  front: null, // { original, canvas, ratios, alignEditor, centeringEditor }
   back: null,
   xraySide: 'front',
   compareSlider: null,
@@ -47,23 +49,52 @@ function setupUpload(side, dropId, inputId, previewId) {
 async function handleFile(side, file, previewEl) {
   const img = await loadImageFromFile(file);
   const canvas = toWorkingCanvas(img);
-  state[side] = { canvas, ratios: null };
+  state[side] = { original: canvas, canvas, ratios: null, alignEditor: null, centeringEditor: null };
 
   previewEl.src = canvasToDataUrl(canvas, 0.85);
   previewEl.hidden = false;
 
   if (state.front && state.back) {
-    document.getElementById('panel-centering').hidden = false;
-    document.getElementById('panel-xray').hidden = false;
-    document.getElementById('panel-analyze').hidden = false;
-    setupCentering('front', 'front-centering-canvas', 'front-ratio-lr', 'front-ratio-tb', 'front-reset-btn');
-    setupCentering('back', 'back-centering-canvas', 'back-ratio-lr', 'back-ratio-tb', 'back-reset-btn');
-    setupXray();
+    document.getElementById('panel-align').hidden = false;
+    setupAlign('front', 'front-align-canvas', 'front-align-reset-btn');
+    setupAlign('back', 'back-align-canvas', 'back-align-reset-btn');
   }
 }
 
 setupUpload('front', 'front-drop', 'front-input', 'front-preview');
 setupUpload('back', 'back-drop', 'back-input', 'back-preview');
+
+// ---- Align (perspective correction) ----
+function setupAlign(side, canvasId, resetBtnId) {
+  const displayCanvas = document.getElementById(canvasId);
+  const original = state[side].original;
+  displayCanvas.width = original.width;
+  displayCanvas.height = original.height;
+  displayCanvas._sourceImage = original;
+
+  const initial = defaultCorners(original.width, original.height);
+  const editor = attachCornerPicker(displayCanvas, initial, () => {});
+  state[side].alignEditor = editor;
+
+  document.getElementById(resetBtnId).onclick = () => {
+    editor.setCorners(defaultCorners(original.width, original.height));
+  };
+}
+
+document.getElementById('confirm-align-btn').addEventListener('click', () => {
+  ['front', 'back'].forEach((side) => {
+    const corners = state[side].alignEditor.getCorners();
+    state[side].canvas = warpQuadToRect(state[side].original, corners);
+  });
+
+  document.getElementById('panel-centering').hidden = false;
+  document.getElementById('panel-xray').hidden = false;
+  document.getElementById('panel-analyze').hidden = false;
+
+  setupCentering('front', 'front-centering-canvas', 'front-ratio-lr', 'front-ratio-tb', 'front-reset-btn');
+  setupCentering('back', 'back-centering-canvas', 'back-ratio-lr', 'back-ratio-tb', 'back-reset-btn');
+  setupXray();
+});
 
 // ---- Centering ----
 function setupCentering(side, canvasId, lrId, tbId, resetBtnId) {
@@ -85,6 +116,7 @@ function setupCentering(side, canvasId, lrId, tbId, resetBtnId) {
 
   const initialBorders = autoDetectBorders(workingCanvas);
   const editor = attachBorderEditor(displayCanvas, initialBorders, updateRatioDisplay);
+  state[side].centeringEditor = editor;
   updateRatioDisplay(initialBorders);
 
   document.getElementById(resetBtnId).onclick = () => {
@@ -185,35 +217,43 @@ document.getElementById('analyze-btn').addEventListener('click', async () => {
   }
 });
 
-// ---- Save ----
-document.getElementById('save-btn').addEventListener('click', async () => {
+// ---- Save as Image ----
+document.getElementById('save-image-btn').addEventListener('click', async () => {
   const statusEl = document.getElementById('save-status');
   if (!state.lastResult) return;
 
-  document.getElementById('save-btn').disabled = true;
-  statusEl.textContent = 'Saving…';
+  const btn = document.getElementById('save-image-btn');
+  btn.disabled = true;
+  statusEl.textContent = 'กำลังสร้างภาพ…';
 
   try {
-    await saveCard({
+    const now = new Date();
+    const timestamp = now.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+    const reportCanvas = await generateReportImage({
       game: state.game,
       cardName: document.getElementById('card-name').value.trim(),
       setName: document.getElementById('set-name').value.trim(),
       cardNumber: document.getElementById('card-number').value.trim(),
-      frontImageDataUrl: canvasToDataUrl(state.front.canvas),
-      backImageDataUrl: canvasToDataUrl(state.back.canvas),
+      frontCanvas: state.front.canvas,
+      backCanvas: state.back.canvas,
+      frontBorders: state.front.centeringEditor.getBorders(),
+      backBorders: state.back.centeringEditor.getBorders(),
       centering: state.lastResult.centering,
       cornersScore: state.lastResult.corners_score,
       surfaceScore: state.lastResult.surface_score,
       edgesScore: state.lastResult.edges_score,
       companies: state.lastResult.companies,
       defects: state.lastResult.defects,
-      aiRawResponse: state.lastResult.ai_raw_response,
-      notes: document.getElementById('notes-input').value.trim(),
+      timestamp,
     });
-    statusEl.textContent = 'Saved ✓ — ดูได้ในแท็บ History';
+
+    const fileStamp = now.toISOString().replace(/[:.]/g, '-');
+    downloadCanvasAsImage(reportCanvas, `cardify-pregrade-${fileStamp}.png`);
+    statusEl.textContent = 'บันทึกภาพแล้ว ✓';
   } catch (err) {
     statusEl.textContent = `Error: ${err.message}`;
   } finally {
-    document.getElementById('save-btn').disabled = false;
+    btn.disabled = false;
   }
 });

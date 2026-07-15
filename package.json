@@ -4,7 +4,6 @@
   "private": true,
   "description": "Personal Pokemon / One Piece TCG pre-grading tool",
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.32.1",
-    "@supabase/supabase-js": "^2.45.4"
+    "@anthropic-ai/sdk": "^0.32.1"
   }
 }

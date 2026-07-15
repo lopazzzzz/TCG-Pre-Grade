@@ -49,7 +49,7 @@ export function generateCornerCrops(canvas) {
     const ctx = crop.getContext('2d');
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(canvas, sx, sy, cw, ch, 0, 0, crop.width, crop.height);
-    return { key, dataUrl: canvasToDataUrl(crop) };
+    return { key, canvas: crop, dataUrl: canvasToDataUrl(crop) };
   });
 }
 

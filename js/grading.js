@@ -21,17 +21,6 @@ export async function analyzeCard(payload) {
   return data;
 }
 
-export async function saveCard(payload) {
-  const res = await fetch(`${API_BASE}/save-card`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  const data = await parseJsonResponse(res);
-  if (!res.ok) throw new Error(data.error || 'Save request failed');
-  return data;
-}
-
 function scoreClass(score) {
   if (score >= 9) return 'score--great';
   if (score >= 7.5) return 'score--good';
@@ -86,8 +75,7 @@ function defectItem(defect, imageSources) {
 // disclaimer) into `container`. `imageSources` (optional) is
 // `{ front, back }`, each a canvas or loaded <img> for the corresponding
 // full card photo — when provided, each defect gets a cropped, circled
-// thumbnail of its approximate zone. Used both for a fresh analysis and for
-// read-only history detail views.
+// thumbnail of its approximate zone.
 export function renderResultsDashboard(container, result, imageSources) {
   container.innerHTML = '';
   container.className = 'results-dashboard';

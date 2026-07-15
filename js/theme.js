@@ -14,7 +14,7 @@ function applyTheme(theme) {
 }
 
 // The <head> inline script already set data-theme before first paint (see
-// index.html/history.html) — this just wires up the button and syncs its icon.
+// index.html) — this just wires up the button and syncs its icon.
 export function initThemeToggle() {
   applyTheme(currentTheme());
   const btn = document.getElementById('theme-toggle');

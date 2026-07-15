@@ -1,0 +1,200 @@
+// 4-corner perspective correction.
+//
+// A rotated photo is a simple in-plane rotation, but a photo taken from any
+// angle other than straight overhead makes the card look like a trapezoid,
+// not just a tilted rectangle — a plain "straighten" slider cannot fix that.
+// This lets the user drag the 4 corners onto the card's actual corners in
+// the photo (however skewed) and warps that quadrilateral back into a clean
+// rectangle before any measurement happens.
+//
+// Implementation: canvas 2D only supports affine transforms (no true
+// perspective divide), so the source quad is subdivided into a fine grid via
+// bilinear interpolation of its 4 corners, and each small grid cell is drawn
+// as 2 triangles using a closed-form 3-point affine transform per triangle.
+// For the mild, smooth distortion of a hand-photographed flat card this is
+// visually indistinguishable from a true homography.
+
+function solve3x3(A, bVec) {
+  const M = A.map((row, i) => [...row, bVec[i]]);
+  for (let col = 0; col < 3; col++) {
+    let pivotRow = col;
+    for (let r = col + 1; r < 3; r++) {
+      if (Math.abs(M[r][col]) > Math.abs(M[pivotRow][col])) pivotRow = r;
+    }
+    [M[col], M[pivotRow]] = [M[pivotRow], M[col]];
+    const pivotVal = M[col][col];
+    for (let k = col; k < 4; k++) M[col][k] /= pivotVal;
+    for (let r = 0; r < 3; r++) {
+      if (r === col) continue;
+      const factor = M[r][col];
+      for (let k = col; k < 4; k++) M[r][k] -= factor * M[col][k];
+    }
+  }
+  return [M[0][3], M[1][3], M[2][3]];
+}
+
+// Solves X = a*x + b*y + c, Y = d*x + e*y + f from 3 point correspondences.
+function affineFromPoints(src, dst) {
+  const A = src.map((p) => [p.x, p.y, 1]);
+  const [a, b, c] = solve3x3(A, dst.map((p) => p.x));
+  const [d, e, f] = solve3x3(A, dst.map((p) => p.y));
+  return { a, b, c, d, e, f };
+}
+
+function drawTriangle(ctx, source, srcTri, dstTri) {
+  const { a, b, c, d, e, f } = affineFromPoints(srcTri, dstTri);
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(dstTri[0].x, dstTri[0].y);
+  ctx.lineTo(dstTri[1].x, dstTri[1].y);
+  ctx.lineTo(dstTri[2].x, dstTri[2].y);
+  ctx.closePath();
+  ctx.clip();
+  ctx.transform(a, d, b, e, c, f);
+  ctx.drawImage(source, 0, 0);
+  ctx.restore();
+}
+
+function dist(p1, p2) {
+  return Math.hypot(p2.x - p1.x, p2.y - p1.y);
+}
+
+// corners: { tl, tr, bl, br }, each {x, y} in source pixel coordinates.
+// Output size is derived from the quad's own average edge lengths so the
+// corrected image keeps the proportions the user actually framed.
+export function warpQuadToRect(source, corners, gridSize = 12) {
+  const { tl, tr, bl, br } = corners;
+  const outWidth = Math.round((dist(tl, tr) + dist(bl, br)) / 2);
+  const outHeight = Math.round((dist(tl, bl) + dist(tr, br)) / 2);
+
+  const out = document.createElement('canvas');
+  out.width = Math.max(1, outWidth);
+  out.height = Math.max(1, outHeight);
+  const ctx = out.getContext('2d');
+
+  function bilinear(u, v) {
+    const top = { x: tl.x + (tr.x - tl.x) * u, y: tl.y + (tr.y - tl.y) * u };
+    const bottom = { x: bl.x + (br.x - bl.x) * u, y: bl.y + (br.y - bl.y) * u };
+    return { x: top.x + (bottom.x - top.x) * v, y: top.y + (bottom.y - top.y) * v };
+  }
+
+  for (let j = 0; j < gridSize; j++) {
+    for (let i = 0; i < gridSize; i++) {
+      const u0 = i / gridSize, u1 = (i + 1) / gridSize;
+      const v0 = j / gridSize, v1 = (j + 1) / gridSize;
+
+      const srcTL = bilinear(u0, v0), srcTR = bilinear(u1, v0);
+      const srcBL = bilinear(u0, v1), srcBR = bilinear(u1, v1);
+
+      const dstTL = { x: u0 * out.width, y: v0 * out.height };
+      const dstTR = { x: u1 * out.width, y: v0 * out.height };
+      const dstBL = { x: u0 * out.width, y: v1 * out.height };
+      const dstBR = { x: u1 * out.width, y: v1 * out.height };
+
+      drawTriangle(ctx, source, [srcTL, srcTR, srcBL], [dstTL, dstTR, dstBL]);
+      drawTriangle(ctx, source, [srcTR, srcBR, srcBL], [dstTR, dstBR, dstBL]);
+    }
+  }
+
+  return out;
+}
+
+export function defaultCorners(width, height) {
+  const insetX = width * 0.04;
+  const insetY = height * 0.04;
+  return {
+    tl: { x: insetX, y: insetY },
+    tr: { x: width - insetX, y: insetY },
+    bl: { x: insetX, y: height - insetY },
+    br: { x: width - insetX, y: height - insetY },
+  };
+}
+
+// Interactive 4-point draggable overlay for picking the card's corners on
+// `canvas` (which must have canvas._sourceImage set to the image/canvas to
+// display and warp).
+export function attachCornerPicker(canvas, initialCorners, onChange) {
+  let corners = {
+    tl: { ...initialCorners.tl }, tr: { ...initialCorners.tr },
+    bl: { ...initialCorners.bl }, br: { ...initialCorners.br },
+  };
+  const HIT_PX = 22;
+
+  function draw() {
+    const ctx = canvas.getContext('2d');
+    const img = canvas._sourceImage;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+    ctx.save();
+    ctx.strokeStyle = '#ffce45';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(corners.tl.x, corners.tl.y);
+    ctx.lineTo(corners.tr.x, corners.tr.y);
+    ctx.lineTo(corners.br.x, corners.br.y);
+    ctx.lineTo(corners.bl.x, corners.bl.y);
+    ctx.closePath();
+    ctx.stroke();
+
+    ctx.fillStyle = '#ffce45';
+    Object.values(corners).forEach((p) => {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 9, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    ctx.restore();
+  }
+
+  function nearestCorner(px, py) {
+    let best = null;
+    let bestDist = Infinity;
+    for (const key of ['tl', 'tr', 'bl', 'br']) {
+      const d = dist(corners[key], { x: px, y: py });
+      if (d < bestDist) { bestDist = d; best = key; }
+    }
+    return bestDist <= HIT_PX ? best : null;
+  }
+
+  let dragging = null;
+
+  function pointerPos(evt) {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: (evt.clientX - rect.left) * (canvas.width / rect.width),
+      y: (evt.clientY - rect.top) * (canvas.height / rect.height),
+    };
+  }
+
+  canvas.addEventListener('pointerdown', (evt) => {
+    const { x, y } = pointerPos(evt);
+    dragging = nearestCorner(x, y);
+    if (dragging) canvas.setPointerCapture(evt.pointerId);
+  });
+
+  canvas.addEventListener('pointermove', (evt) => {
+    if (!dragging) return;
+    const { x, y } = pointerPos(evt);
+    corners[dragging] = {
+      x: Math.min(canvas.width, Math.max(0, x)),
+      y: Math.min(canvas.height, Math.max(0, y)),
+    };
+    draw();
+    onChange(corners);
+  });
+
+  ['pointerup', 'pointercancel'].forEach((evtName) => {
+    canvas.addEventListener(evtName, () => { dragging = null; });
+  });
+
+  draw();
+
+  return {
+    getCorners: () => ({ ...corners }),
+    setCorners: (next) => {
+      corners = { tl: { ...next.tl }, tr: { ...next.tr }, bl: { ...next.bl }, br: { ...next.br } };
+      draw();
+      onChange(corners);
+    },
+  };
+}
