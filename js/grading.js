@@ -55,9 +55,11 @@ function defectItem(defect, imageSources) {
   const el = document.createElement('li');
   el.className = `defect-item defect-item--${defect.severity || 'minor'}`;
 
-  const source = imageSources && imageSources[defect.side || 'front'];
+  const side = defect.side || 'front';
+  const source = imageSources && imageSources[side];
+  const bounds = imageSources && (side === 'back' ? imageSources.backBounds : imageSources.frontBounds);
   const thumbHtml = source
-    ? `<img class="defect-item__thumb" src="${cropZoneThumbnail(source, defect.zone)}" alt="${defect.zone} area, circled approximately">`
+    ? `<img class="defect-item__thumb" src="${cropZoneThumbnail(source, defect.zone, bounds)}" alt="${defect.zone} area, circled approximately">`
     : '';
 
   el.innerHTML = `

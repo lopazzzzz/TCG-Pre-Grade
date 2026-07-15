@@ -371,14 +371,17 @@ input[type="range"]::-moz-range-thumb {
 .defects-block { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px 18px; }
 .defects-block h3 { margin: 0 0 10px; font-size: 0.95rem; font-weight: 700; }
 .defects-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.defect-item { display: flex; gap: 12px; font-size: 0.85rem; padding: 10px; border-radius: var(--radius-sm); background: var(--surface-alt); align-items: flex-start; }
+.defect-item { display: flex; gap: 14px; font-size: 0.85rem; padding: 12px; border-radius: var(--radius-sm); background: var(--surface-alt); align-items: flex-start; }
 .defect-item__thumb {
-  width: 72px;
-  height: 72px;
+  width: 130px;
+  height: 130px;
   object-fit: cover;
   border-radius: 8px;
   flex: none;
   background: #000;
+}
+@media (max-width: 400px) {
+  .defect-item__thumb { width: 96px; height: 96px; }
 }
 .defect-item__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .defect-item__category { text-transform: uppercase; font-size: 0.7rem; font-weight: 700; color: var(--text-muted); letter-spacing: 0.03em; }

@@ -1,5 +1,5 @@
-const { SYSTEM_PROMPT, buildUserText, parseGradingResponse, computeCompanyEstimates } = require('./lib/gradingPrompt');
-const { logScan } = require('./lib/scanLog');
+import { SYSTEM_PROMPT, buildUserText, parseGradingResponse, computeCompanyEstimates } from '../../lib/gradingPrompt.js';
+import { logScan } from '../../lib/scanLog.js';
 
 const GEMINI_MODEL = 'gemini-3.1-flash-lite';
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
@@ -16,13 +16,9 @@ function dataUrlToInlineData(dataUrl) {
   return { inline_data: { mime_type: match[1], data: match[2] } };
 }
 
-exports.handler = async (event) => {
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
-  }
-
+export async function onRequestPost({ request, env }) {
   try {
-    const body = JSON.parse(event.body || '{}');
+    const body = await request.json().catch(() => ({}));
     const {
       game, cardName, setName, cardNumber,
       centeringFrontRatio, centeringBackRatio,
@@ -30,7 +26,7 @@ exports.handler = async (event) => {
     } = body;
 
     if (!game || !centeringFrontRatio || !centeringBackRatio || !images) {
-      return { statusCode: 400, body: JSON.stringify({ error: 'Missing required fields' }) };
+      return Response.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
     const orderedImages = [
@@ -40,12 +36,12 @@ exports.handler = async (event) => {
     ];
 
     if (orderedImages.length !== 10 || orderedImages.some((i) => !i)) {
-      return { statusCode: 400, body: JSON.stringify({ error: 'Expected 10 images: front, back, 4 front corners, 4 back corners' }) };
+      return Response.json({ error: 'Expected 10 images: front, back, 4 front corners, 4 back corners' }, { status: 400 });
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = env.GEMINI_API_KEY;
     if (!apiKey) {
-      return { statusCode: 500, body: JSON.stringify({ error: 'Server missing GEMINI_API_KEY' }) };
+      return Response.json({ error: 'Server missing GEMINI_API_KEY' }, { status: 500 });
     }
 
     const parts = [
@@ -75,7 +71,7 @@ exports.handler = async (event) => {
     const json = await res.json();
     if (!res.ok) {
       const message = json.error?.message || `Gemini API error (HTTP ${res.status})`;
-      return { statusCode: 502, body: JSON.stringify({ error: message }) };
+      return Response.json({ error: message }, { status: 502 });
     }
 
     const text = json.candidates?.[0]?.content?.parts?.find((p) => p.text)?.text;
@@ -93,34 +89,31 @@ exports.handler = async (event) => {
     // Log every completed scan for the admin dashboard. Best-effort: a
     // logging failure should never break the user-facing analysis result.
     try {
-      await logScan({ event, game, cardName, setName, cardNumber, centeringFrontRatio, centeringBackRatio, graded, estimates, images });
+      await logScan(env, { request, game, cardName, setName, cardNumber, centeringFrontRatio, centeringBackRatio, graded, estimates, images });
     } catch (logErr) {
       console.error('scan log write failed', logErr);
     }
 
-    return {
-      statusCode: 200,
-      body: JSON.stringify({
-        centering: {
-          score: estimates.centering_display_score,
-          front_ratio: centeringFrontRatio,
-          back_ratio: centeringBackRatio,
-        },
-        corners_score: graded.corners_score,
-        surface_score: graded.surface_score,
-        edges_score: graded.edges_score,
-        defects: graded.defects,
-        summary: graded.summary,
-        companies: {
-          psa: { estimate: estimates.psa_estimate, confidence: estimates.psa_confidence },
-          cgc: { estimate: estimates.cgc_estimate, confidence: estimates.cgc_confidence },
-          bgs: { estimate: estimates.bgs_estimate, confidence: estimates.bgs_confidence },
-          tag: { estimate: estimates.tag_estimate, confidence: estimates.tag_confidence },
-        },
-        ai_raw_response: json,
-      }),
-    };
+    return Response.json({
+      centering: {
+        score: estimates.centering_display_score,
+        front_ratio: centeringFrontRatio,
+        back_ratio: centeringBackRatio,
+      },
+      corners_score: graded.corners_score,
+      surface_score: graded.surface_score,
+      edges_score: graded.edges_score,
+      defects: graded.defects,
+      summary: graded.summary,
+      companies: {
+        psa: { estimate: estimates.psa_estimate, confidence: estimates.psa_confidence },
+        cgc: { estimate: estimates.cgc_estimate, confidence: estimates.cgc_confidence },
+        bgs: { estimate: estimates.bgs_estimate, confidence: estimates.bgs_confidence },
+        tag: { estimate: estimates.tag_estimate, confidence: estimates.tag_confidence },
+      },
+      ai_raw_response: json,
+    });
   } catch (err) {
-    return { statusCode: 500, body: JSON.stringify({ error: err.message || 'Unknown error' }) };
+    return Response.json({ error: err.message || 'Unknown error' }, { status: 500 });
   }
-};
+}

@@ -183,8 +183,10 @@ document.getElementById('analyze-btn').addEventListener('click', async () => {
   document.getElementById('analyze-btn').disabled = true;
 
   try {
-    const frontCrops = generateCornerCrops(state.front.canvas);
-    const backCrops = generateCornerCrops(state.back.canvas);
+    const frontOuter = state.front.centeringEditor.getBorders().outer;
+    const backOuter = state.back.centeringEditor.getBorders().outer;
+    const frontCrops = generateCornerCrops(state.front.canvas, frontOuter);
+    const backCrops = generateCornerCrops(state.back.canvas, backOuter);
 
     const payload = {
       game: state.game,
@@ -207,6 +209,8 @@ document.getElementById('analyze-btn').addEventListener('click', async () => {
     renderResultsDashboard(document.getElementById('results-container'), result, {
       front: state.front.canvas,
       back: state.back.canvas,
+      frontBounds: frontOuter,
+      backBounds: backOuter,
     });
     document.getElementById('save-section').hidden = false;
     document.getElementById('save-status').textContent = '';
@@ -232,6 +236,9 @@ document.getElementById('save-image-btn').addEventListener('click', async () => 
     const now = new Date();
     const timestamp = now.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
+    const frontBorders = state.front.centeringEditor.getBorders();
+    const backBorders = state.back.centeringEditor.getBorders();
+
     const reportCanvas = await generateReportImage({
       game: state.game,
       cardName: document.getElementById('card-name').value.trim(),
@@ -239,8 +246,10 @@ document.getElementById('save-image-btn').addEventListener('click', async () => 
       cardNumber: document.getElementById('card-number').value.trim(),
       frontCanvas: state.front.canvas,
       backCanvas: state.back.canvas,
-      frontBorders: state.front.centeringEditor.getBorders(),
-      backBorders: state.back.centeringEditor.getBorders(),
+      frontBorders,
+      backBorders,
+      frontCardBounds: frontBorders.outer,
+      backCardBounds: backBorders.outer,
       centering: state.lastResult.centering,
       cornersScore: state.lastResult.corners_score,
       surfaceScore: state.lastResult.surface_score,
@@ -267,5 +276,7 @@ document.addEventListener('cardify:langchange', () => {
   renderResultsDashboard(document.getElementById('results-container'), state.lastResult, {
     front: state.front.canvas,
     back: state.back.canvas,
+    frontBounds: state.front.centeringEditor.getBorders().outer,
+    backBounds: state.back.centeringEditor.getBorders().outer,
   });
 });

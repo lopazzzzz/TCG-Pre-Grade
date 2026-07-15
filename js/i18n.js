@@ -27,7 +27,7 @@ export const translations = {
     confirm_alignment: 'ยืนยันการจัดตำแหน่ง',
 
     step4_title: 'วัด Centering',
-    step4_hint: 'เส้นสีเหลืองคือขอบในที่ตรวจจับอัตโนมัติ — ลากปรับได้ถ้าไม่ตรง',
+    step4_hint: 'เส้นฟ้า = ขอบนอกของการ์ด, เส้นชมพู = กรอบในของการ์ด (ตรวจจับอัตโนมัติทั้งคู่) — ลากปรับได้ถ้าไม่ตรง',
     redetect: 'ตรวจจับใหม่',
 
     step5_title: 'เครื่องมือปรับแสง / X-ray',
@@ -94,7 +94,7 @@ export const translations = {
     confirm_alignment: 'Confirm alignment',
 
     step4_title: 'Centering measurement',
-    step4_hint: 'Yellow lines are the auto-detected inner border — drag to correct if needed.',
+    step4_hint: 'Cyan = the card\'s outer edge, pink = its inner border (both auto-detected) — drag either to correct if needed.',
     redetect: 'Re-detect',
 
     step5_title: 'Light / X-ray inspection tool',

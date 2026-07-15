@@ -26,20 +26,36 @@ export function canvasToDataUrl(canvas, quality = 0.88) {
   return canvas.toDataURL('image/jpeg', quality);
 }
 
+const FULL_BOUNDS = { left: 0, right: 1, top: 0, bottom: 1 };
+
+// Resolves fractional card bounds (as measured by centering.js's outer-edge
+// detection) into an absolute pixel box within `canvas`. Defaults to the
+// whole canvas when no bounds are given, so callers that don't have a
+// measured card region (e.g. admin log playback) still work.
+function cardBoxPx(canvas, bounds) {
+  const b = bounds || FULL_BOUNDS;
+  const x = b.left * canvas.width;
+  const y = b.top * canvas.height;
+  return { x, y, w: (b.right - b.left) * canvas.width, h: (b.bottom - b.top) * canvas.height };
+}
+
 // Generates 4 zoomed corner crops (dataURLs) from a working canvas, each
-// covering CORNER_CROP_FRACTION of width/height, upscaled ~2.5x so Claude
+// covering CORNER_CROP_FRACTION of the CARD's own width/height (not the
+// full canvas — a photo often has some background margin around the card,
+// and cropping relative to the canvas edges in that case would grab mostly
+// background instead of the card's actual corner), upscaled ~2.5x so the AI
 // gets genuine close-up detail rather than a shrunk full card.
-export function generateCornerCrops(canvas) {
-  const { width, height } = canvas;
-  const cw = Math.round(width * CORNER_CROP_FRACTION);
-  const ch = Math.round(height * CORNER_CROP_FRACTION);
+export function generateCornerCrops(canvas, cardBounds) {
+  const box = cardBoxPx(canvas, cardBounds);
+  const cw = Math.round(box.w * CORNER_CROP_FRACTION);
+  const ch = Math.round(box.h * CORNER_CROP_FRACTION);
   const upscale = 2.5;
 
   const corners = [
-    { key: 'tl', sx: 0, sy: 0 },
-    { key: 'tr', sx: width - cw, sy: 0 },
-    { key: 'bl', sx: 0, sy: height - ch },
-    { key: 'br', sx: width - cw, sy: height - ch },
+    { key: 'tl', sx: box.x, sy: box.y },
+    { key: 'tr', sx: box.x + box.w - cw, sy: box.y },
+    { key: 'bl', sx: box.x, sy: box.y + box.h - ch },
+    { key: 'br', sx: box.x + box.w - cw, sy: box.y + box.h - ch },
   ];
 
   return corners.map(({ key, sx, sy }) => {
@@ -138,22 +154,27 @@ const ZONE_CENTERS = {
 };
 
 // Crops a zoomed-in region of `source` (a canvas or a loaded <img>) around
-// the named 3x3-grid zone and draws a dashed circle roughly marking the
-// flagged spot. This is a zone-level approximation, not a pixel-precise
-// defect locator — Claude names the nearest ninth of the card, not exact
-// coordinates, so the circle is captioned as approximate.
-export function cropZoneThumbnail(source, zone) {
+// the named 3x3-grid zone (measured relative to the card's own bounds, not
+// the full source image, for the same reason as generateCornerCrops above)
+// and draws a bold circle roughly marking the flagged spot. This is a
+// zone-level approximation, not a pixel-precise defect locator — the AI
+// names the nearest ninth of the card, not exact coordinates, so the circle
+// is captioned as approximate.
+export function cropZoneThumbnail(source, zone, cardBounds) {
   const sw = source.naturalWidth || source.width;
   const sh = source.naturalHeight || source.height;
-  const [cx, cy] = ZONE_CENTERS[zone] || ZONE_CENTERS.center;
+  const box = cardBoxPx({ width: sw, height: sh }, cardBounds);
+  const [zx, zy] = ZONE_CENTERS[zone] || ZONE_CENTERS.center;
+  const cx = box.x + zx * box.w;
+  const cy = box.y + zy * box.h;
 
   const cropFrac = 0.45;
-  const cropW = sw * cropFrac;
-  const cropH = sh * cropFrac;
-  const sx = Math.min(Math.max(cx * sw - cropW / 2, 0), sw - cropW);
-  const sy = Math.min(Math.max(cy * sh - cropH / 2, 0), sh - cropH);
+  const cropW = box.w * cropFrac;
+  const cropH = box.h * cropFrac;
+  const sx = Math.min(Math.max(cx - cropW / 2, 0), sw - cropW);
+  const sy = Math.min(Math.max(cy - cropH / 2, 0), sh - cropH);
 
-  const upscale = 2;
+  const upscale = 3;
   const out = document.createElement('canvas');
   out.width = Math.round(cropW * upscale);
   out.height = Math.round(cropH * upscale);
@@ -162,11 +183,11 @@ export function cropZoneThumbnail(source, zone) {
   ctx.drawImage(source, sx, sy, cropW, cropH, 0, 0, out.width, out.height);
 
   ctx.save();
-  ctx.strokeStyle = '#e0453f';
-  ctx.lineWidth = 3;
-  ctx.setLineDash([7, 5]);
+  ctx.strokeStyle = '#ff2222';
+  ctx.lineWidth = Math.max(5, out.width * 0.02);
+  ctx.setLineDash([out.width * 0.035, out.width * 0.025]);
   ctx.beginPath();
-  ctx.ellipse(out.width / 2, out.height / 2, out.width * 0.32, out.height * 0.32, 0, 0, Math.PI * 2);
+  ctx.ellipse(out.width / 2, out.height / 2, out.width * 0.34, out.height * 0.34, 0, 0, Math.PI * 2);
   ctx.stroke();
   ctx.restore();
 

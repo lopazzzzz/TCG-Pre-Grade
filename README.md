@@ -21,53 +21,65 @@ results.
    "model no longer available" error, check
    [ai.google.dev/gemini-api/docs/models](https://ai.google.dev/gemini-api/docs/models)
    for the current flash-lite model ID and update it in
-   `netlify/functions/analyze-card.js`.
+   `functions/api/analyze-card.js`.
 
 ## 2. Set up the admin dashboard
 
 The app automatically logs every completed scan (card details, scores,
-images) to Netlify Blobs — no external database needed — viewable at
+images) to a Cloudflare R2 bucket — no external database needed — viewable at
 `/admin.html`, gated behind a single shared password (no user accounts).
 
-Pick two values and set them as environment variables:
+Pick two values, to be set as environment variables in step 3:
 - `ADMIN_PASSWORD` — whatever password you'll log in with.
 - `ADMIN_SESSION_SECRET` — any long random string (used to sign the login
   session cookie so it can't be forged). Generate one with, e.g.,
   `openssl rand -hex 32`.
 
-## 3. Deploy to Netlify
+## 3. Deploy to Cloudflare Pages
 
-1. Push this `tcg-pregrade/` folder to its own git repository (GitHub/GitLab/Bitbucket).
-2. In Netlify: **Add new site → Import an existing project**, connect the repo.
-   Build settings are already defined in `netlify.toml` (build command
-   `npm install`, functions in `netlify/functions`), so you shouldn't need to
-   change anything.
-3. Go to **Site settings → Environment variables** and add `GEMINI_API_KEY`,
-   `ADMIN_PASSWORD`, and `ADMIN_SESSION_SECRET`.
-4. Deploy. Netlify will give you a URL like `https://<something>.netlify.app` —
-   open it on both desktop Chrome and mobile Chrome to confirm everything works
-   (camera upload on mobile, drag-and-drop on desktop), and open `/admin.html`
-   to confirm the dashboard logs in and shows scans after you analyze a card.
-
-Alternative for a quick start without git: `netlify deploy` (from the Netlify
-CLI) run from inside this folder also works, using the same env vars set via
-`netlify env:set`.
+1. Create a free [Cloudflare account](https://dash.cloudflare.com/sign-up) if
+   you don't have one.
+2. **Create the R2 bucket**: dashboard → **R2 Object Storage** → **Create
+   bucket** → name it `cardify-scans` (matches `wrangler.toml`). R2's free
+   tier (10 GB storage, 1M reads / 1M writes per month) requires adding a
+   payment method to your account even though the free tier itself costs
+   nothing — Cloudflare does this to prevent abuse, you won't be charged
+   unless you exceed the free tier.
+3. Push this `tcg-pregrade/` folder to its own git repository (GitHub/GitLab).
+4. In Cloudflare dashboard: **Workers & Pages → Create → Pages → Connect to
+   Git**, pick the repo. Build settings: no build command needed, output
+   directory `/` (the repo root) — `wrangler.toml` already declares this via
+   `pages_build_output_dir`.
+5. After the first deploy, go to the project's **Settings → Bindings** and
+   add an **R2 bucket** binding: variable name `SCAN_BUCKET`, bucket
+   `cardify-scans` (this mirrors `wrangler.toml` for the deployed
+   environment; the dashboard binding is what production actually uses).
+6. Go to **Settings → Environment variables** and add `GEMINI_API_KEY`,
+   `ADMIN_PASSWORD`, and `ADMIN_SESSION_SECRET` (mark them as **Secret**, not
+   plaintext).
+7. Redeploy (**Deployments → Retry deployment**, or just push a commit) so the
+   new bindings/env vars take effect. Cloudflare gives you a URL like
+   `https://<something>.pages.dev` — open it on both desktop Chrome and mobile
+   Chrome to confirm everything works (camera upload on mobile, drag-and-drop
+   on desktop), and open `/admin.html` to confirm the dashboard logs in and
+   shows scans after you analyze a card.
 
 ## 4. Local development
 
 ```
-npm install -g netlify-cli   # once
+npm install -g wrangler   # once
 cd tcg-pregrade
-netlify env:set GEMINI_API_KEY AIza...
-netlify env:set ADMIN_PASSWORD your-password
-netlify env:set ADMIN_SESSION_SECRET $(openssl rand -hex 32)
-netlify dev
+wrangler pages dev . --r2 SCAN_BUCKET \
+  -b GEMINI_API_KEY=AIza... \
+  -b ADMIN_PASSWORD=your-password \
+  -b ADMIN_SESSION_SECRET=$(openssl rand -hex 32)
 ```
 
-`netlify dev` serves the static frontend and runs the Netlify Function locally
-with the same `/api/*` redirect used in production. Opening `index.html`
-directly as a `file://` path will NOT work — the AI analysis call needs the
-function server.
+`wrangler pages dev` serves the static frontend and runs the Pages Functions
+locally under `/api/*`, with a local-only simulated R2 bucket (no data ever
+touches your real Cloudflare account). Opening `index.html` directly as a
+`file://` path will NOT work — the AI analysis call needs the function
+server.
 
 ## How it works
 
@@ -88,7 +100,7 @@ function server.
 6. **Per-company estimates**: BGS uses its publicly documented weighted
    formula; TAG uses its published (tighter) centering tolerance tiers; PSA
    and CGC use a "worst factor gates the grade" heuristic since neither
-   publishes an exact formula — see `netlify/functions/lib/gradingPrompt.js`
+   publishes an exact formula — see `lib/gradingPrompt.js`
    for the full logic and reasoning behind each company's numbers.
    **Confidence %** drops for borderline centering measurements or cards with
    a wide spread between sub-scores, and rises for clearly flawless or
@@ -98,8 +110,8 @@ function server.
    thumbnails) as a downloadable PNG, generated entirely in the browser and
    saved straight to your device.
 8. Every completed scan is also logged server-side (images + full result) to
-   Netlify Blobs for the admin dashboard at `/admin.html` — see "Set up the
-   admin dashboard" above.
+   a Cloudflare R2 bucket for the admin dashboard at `/admin.html` — see "Set
+   up the admin dashboard" above.
 
 None of this replaces an in-hand human grader — glare, gloss, and physical
 feel of a card can reveal things a photo can't. Treat results as a strong

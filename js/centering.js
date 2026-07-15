@@ -1,30 +1,30 @@
 // Geometric centering measurement.
 //
-// Assumption (stated to the user in the UI): the uploaded photo is a
-// reasonably tight, frame-filling shot of the card, front-on, not at an
-// angle — the same assumption every centering-measurement tool (including
-// Rawlity, referenced by the user) relies on. Under that assumption, the
-// card's own outer edge is approximately the image's outer edge, so we only
-// need to find the INNER printed border line (the transition from the
-// solid-color border frame to the artwork) on each of the 4 sides — that's
-// a real, detectable contrast edge, unlike trying to segment the physical
-// card from an arbitrary background.
-//
-// Auto-detection is a starting point, not the final word: the UI overlays 4
-// draggable lines so the user can correct any side the algorithm gets wrong
-// (glare, holo pattern, full-art card with no solid border, etc).
+// Real centering is the position of the INNER printed border (the frame
+// around the artwork) relative to the card's own OUTER physical edge — not
+// relative to the photo frame. Many real-world photos leave some background
+// visible around the card, so we detect both edges in two stages:
+//   1. OUTER: the card-vs-background edge, searched near the photo's own
+//      boundary (a strong, usually high-contrast transition).
+//   2. INNER: the border-to-artwork edge, searched only within the outer
+//      card region found in stage 1 (so it can't accidentally lock onto the
+//      outer edge itself, or onto some contrasty spot deep in the artwork).
+// Both lines are drawn and are independently draggable, so a user can
+// correct either one if the auto-detection gets confused (glare, holo
+// pattern, full-art card with no solid border, etc).
 
 function luminance(data, i) {
   return 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
 }
 
-// Scans a band near one edge and returns the fractional position (0-1) of
-// the strongest brightness transition, restricted to a plausible border
-// width range so it doesn't just find the card's own outer edge.
-function detectEdgeFraction(imageData, width, height, side) {
-  const searchMin = 0.02; // skip the first ~2% (anti-alias/photo edge noise)
-  const searchMax = 0.30; // borders are essentially never more than ~30% of the dimension
-
+// Detects a brightness transition for `side` within the absolute pixel
+// window [loPx, hiPx). Scans from the edge nearest to that window's outer
+// boundary inward (so "first strong transition encountered" means "nearest
+// to the outside"), using a windowed gradient (average of a few samples
+// ahead vs. behind) rather than a single-pixel diff, since holo/foil
+// textures and print noise create single-pixel spikes a naive diff would
+// mistake for a real edge. Returns a fraction of the full dimension (0-1).
+function detectTransition(imageData, width, height, side, loPx, hiPx) {
   const isHorizontalScan = side === 'left' || side === 'right';
   const scanLength = isHorizontalScan ? width : height;
   const stripStart = isHorizontalScan ? Math.floor(height * 0.4) : Math.floor(width * 0.4);
@@ -44,12 +44,6 @@ function detectEdgeFraction(imageData, width, height, side) {
     profile[p] = sum / count;
   }
 
-  // Windowed gradient (average of a few samples ahead vs. a few behind)
-  // rather than a single-pixel difference — a real border-to-artwork edge
-  // is a sustained transition, while holo/foil textures and print noise
-  // create single-pixel luminance spikes that a naive adjacent-pixel diff
-  // can mistake for the border. Averaging over a small window smooths out
-  // that noise while still catching genuine edges at this resolution.
   const WINDOW = 3;
   function windowedGradient(pos) {
     let before = 0, beforeN = 0, after = 0, afterN = 0;
@@ -61,31 +55,26 @@ function detectEdgeFraction(imageData, width, height, side) {
     return Math.abs(after / afterN - before / beforeN);
   }
 
-  const from = side === 'right' || side === 'bottom';
-  let bestPos = Math.floor(scanLength * searchMin);
-  let bestGrad = -1;
+  const from = side === 'right' || side === 'bottom'; // near edge is the "hi" side
+  const lo = Math.max(0, Math.floor(loPx));
+  const hi = Math.min(scanLength, Math.ceil(hiPx));
+  const STRONG_GRADIENT = 22;
 
-  // A real border-to-artwork transition is almost always the FIRST strong
-  // edge encountered scanning inward from the physical edge — an internal
-  // artwork element farther in can have a bigger raw contrast jump (e.g. a
-  // bright illustration detail) but that's not the border. So take the
-  // first transition that clears a confident threshold, and only fall back
-  // to the single strongest transition in range if nothing clears it (e.g.
-  // a low-contrast/pastel border).
-  const STRONG_GRADIENT = 22; // luminance units, windowed
+  let bestPos = from ? Math.max(lo, hi - 1) : lo;
+  let bestGrad = -1;
   let firstStrongPos = null;
 
-  const lo = Math.floor(scanLength * searchMin);
-  const hi = Math.floor(scanLength * searchMax);
-  for (let p = lo + 1; p < hi; p++) {
-    const pos = from ? scanLength - 1 - p : p;
-    const grad = windowedGradient(pos);
-    if (grad > bestGrad) {
-      bestGrad = grad;
-      bestPos = pos;
+  if (from) {
+    for (let pos = hi - 1; pos >= lo; pos--) {
+      const grad = windowedGradient(pos);
+      if (grad > bestGrad) { bestGrad = grad; bestPos = pos; }
+      if (firstStrongPos === null && grad >= STRONG_GRADIENT) firstStrongPos = pos;
     }
-    if (firstStrongPos === null && grad >= STRONG_GRADIENT) {
-      firstStrongPos = pos;
+  } else {
+    for (let pos = lo; pos < hi; pos++) {
+      const grad = windowedGradient(pos);
+      if (grad > bestGrad) { bestGrad = grad; bestPos = pos; }
+      if (firstStrongPos === null && grad >= STRONG_GRADIENT) firstStrongPos = pos;
     }
   }
 
@@ -97,15 +86,26 @@ export function autoDetectBorders(canvas) {
   const { width, height } = canvas;
   const imageData = ctx.getImageData(0, 0, width, height);
 
-  return {
-    // detectEdgeFraction already returns an absolute position (0=left/top
-    // edge of the image), regardless of which direction it scanned from —
-    // do not re-invert the right/bottom results here.
-    left: detectEdgeFraction(imageData, width, height, 'left'),
-    right: detectEdgeFraction(imageData, width, height, 'right'),
-    top: detectEdgeFraction(imageData, width, height, 'top'),
-    bottom: detectEdgeFraction(imageData, width, height, 'bottom'),
+  // Stage 1 — outer card edge vs. background, searched near the photo edge.
+  const outer = {
+    left: detectTransition(imageData, width, height, 'left', width * 0.01, width * 0.45),
+    right: detectTransition(imageData, width, height, 'right', width * 0.55, width * 0.99),
+    top: detectTransition(imageData, width, height, 'top', height * 0.01, height * 0.45),
+    bottom: detectTransition(imageData, width, height, 'bottom', height * 0.55, height * 0.99),
   };
+
+  // Stage 2 — inner printed border, searched only within the outer card
+  // region (as a fraction of the CARD's own width/height, not the photo's).
+  const cardWPx = (outer.right - outer.left) * width;
+  const cardHPx = (outer.bottom - outer.top) * height;
+  const inner = {
+    left: detectTransition(imageData, width, height, 'left', outer.left * width + cardWPx * 0.01, outer.left * width + cardWPx * 0.32),
+    right: detectTransition(imageData, width, height, 'right', outer.right * width - cardWPx * 0.32, outer.right * width - cardWPx * 0.01),
+    top: detectTransition(imageData, width, height, 'top', outer.top * height + cardHPx * 0.01, outer.top * height + cardHPx * 0.32),
+    bottom: detectTransition(imageData, width, height, 'bottom', outer.bottom * height - cardHPx * 0.32, outer.bottom * height - cardHPx * 0.01),
+  };
+
+  return { outer, inner };
 }
 
 function ratioFromMargins(marginA, marginB) {
@@ -115,13 +115,15 @@ function ratioFromMargins(marginA, marginB) {
   return { a, b: 100 - a };
 }
 
-// borders: fractional {left, right, top, bottom} positions (0-1) of the
-// inner border lines within the image.
+// borders: { outer, inner }, each fractional {left, right, top, bottom}
+// positions (0-1) within the full image. Centering is the inner border's
+// position relative to the OUTER card edges, not the raw photo edges.
 export function computeRatios(borders) {
-  const leftMargin = borders.left;
-  const rightMargin = 1 - borders.right;
-  const topMargin = borders.top;
-  const bottomMargin = 1 - borders.bottom;
+  const { outer, inner } = borders;
+  const leftMargin = inner.left - outer.left;
+  const rightMargin = outer.right - inner.right;
+  const topMargin = inner.top - outer.top;
+  const bottomMargin = outer.bottom - inner.bottom;
 
   const lr = ratioFromMargins(leftMargin, rightMargin);
   const tb = ratioFromMargins(topMargin, bottomMargin);
@@ -138,28 +140,28 @@ export function computeRatios(borders) {
   };
 }
 
-// Interactive 4-line overlay over a canvas. `getBorders`/`setBorders` use
-// fractional coordinates (0-1) so it's resolution independent.
+const OUTER_COLOR = '#00e5ff';
+const INNER_COLOR = '#ff2ea6';
+
+// Interactive dual 4-line overlay (outer card edge + inner printed border)
+// over a canvas. `getBorders`/`setBorders` use fractional coordinates (0-1)
+// so it's resolution independent.
 export function attachBorderEditor(canvas, initialBorders, onChange) {
-  let borders = { ...initialBorders };
-  const HIT_PX = 14;
+  let borders = {
+    outer: { ...initialBorders.outer },
+    inner: { ...initialBorders.inner },
+  };
+  const HIT_PX = 16;
 
-  function draw() {
-    const ctx = canvas.getContext('2d');
-    const img = canvas._sourceImage;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
+  function drawSet(ctx, b, color, lineWidth, dash) {
     ctx.save();
-    ctx.strokeStyle = '#00e5ff';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([6, 4]);
-
-    const x1 = borders.left * canvas.width;
-    const x2 = borders.right * canvas.width;
-    const y1 = borders.top * canvas.height;
-    const y2 = borders.bottom * canvas.height;
-
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lineWidth;
+    ctx.setLineDash(dash);
+    const x1 = b.left * canvas.width;
+    const x2 = b.right * canvas.width;
+    const y1 = b.top * canvas.height;
+    const y2 = b.bottom * canvas.height;
     ctx.beginPath(); ctx.moveTo(x1, 0); ctx.lineTo(x1, canvas.height); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(x2, 0); ctx.lineTo(x2, canvas.height); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(0, y1); ctx.lineTo(canvas.width, y1); ctx.stroke();
@@ -167,19 +169,28 @@ export function attachBorderEditor(canvas, initialBorders, onChange) {
     ctx.restore();
   }
 
+  function draw() {
+    const ctx = canvas.getContext('2d');
+    const img = canvas._sourceImage;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    drawSet(ctx, borders.outer, OUTER_COLOR, 2, [6, 4]);
+    drawSet(ctx, borders.inner, INNER_COLOR, 3, [3, 3]);
+  }
+
   function nearestLine(px, py) {
-    const x1 = borders.left * canvas.width;
-    const x2 = borders.right * canvas.width;
-    const y1 = borders.top * canvas.height;
-    const y2 = borders.bottom * canvas.height;
-    const candidates = [
-      { key: 'left', dist: Math.abs(px - x1) },
-      { key: 'right', dist: Math.abs(px - x2) },
-      { key: 'top', dist: Math.abs(py - y1) },
-      { key: 'bottom', dist: Math.abs(py - y2) },
-    ];
+    const candidates = [];
+    for (const set of ['outer', 'inner']) {
+      const b = borders[set];
+      const x1 = b.left * canvas.width, x2 = b.right * canvas.width;
+      const y1 = b.top * canvas.height, y2 = b.bottom * canvas.height;
+      candidates.push({ set, key: 'left', dist: Math.abs(px - x1) });
+      candidates.push({ set, key: 'right', dist: Math.abs(px - x2) });
+      candidates.push({ set, key: 'top', dist: Math.abs(py - y1) });
+      candidates.push({ set, key: 'bottom', dist: Math.abs(py - y2) });
+    }
     candidates.sort((a, b) => a.dist - b.dist);
-    return candidates[0].dist <= HIT_PX ? candidates[0].key : null;
+    return candidates[0].dist <= HIT_PX ? candidates[0] : null;
   }
 
   let dragging = null;
@@ -203,10 +214,11 @@ export function attachBorderEditor(canvas, initialBorders, onChange) {
     const { x, y } = pointerPos(evt);
     const fx = Math.min(0.49, Math.max(0.01, x / canvas.width));
     const fy = Math.min(0.49, Math.max(0.01, y / canvas.height));
-    if (dragging === 'left') borders.left = Math.min(fx, borders.right - 0.02);
-    if (dragging === 'right') borders.right = Math.max(1 - fx, borders.left + 0.02);
-    if (dragging === 'top') borders.top = Math.min(fy, borders.bottom - 0.02);
-    if (dragging === 'bottom') borders.bottom = Math.max(1 - fy, borders.top + 0.02);
+    const b = borders[dragging.set];
+    if (dragging.key === 'left') b.left = Math.min(fx, b.right - 0.02);
+    if (dragging.key === 'right') b.right = Math.max(1 - fx, b.left + 0.02);
+    if (dragging.key === 'top') b.top = Math.min(fy, b.bottom - 0.02);
+    if (dragging.key === 'bottom') b.bottom = Math.max(1 - fy, b.top + 0.02);
     draw();
     onChange(borders);
   });
@@ -218,8 +230,12 @@ export function attachBorderEditor(canvas, initialBorders, onChange) {
   draw();
 
   return {
-    getBorders: () => ({ ...borders }),
-    setBorders: (next) => { borders = { ...next }; draw(); onChange(borders); },
+    getBorders: () => ({ outer: { ...borders.outer }, inner: { ...borders.inner } }),
+    setBorders: (next) => {
+      borders = { outer: { ...next.outer }, inner: { ...next.inner } };
+      draw();
+      onChange(borders);
+    },
     redraw: draw,
   };
 }

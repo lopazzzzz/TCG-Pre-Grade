@@ -14,7 +14,11 @@ const COLORS = {
   good: '#6fa4ff',
   fair: '#f0b429',
   poor: '#ef5b56',
+  outer: '#00e5ff',
+  inner: '#ff2ea6',
 };
+
+const FULL_BOUNDS = { left: 0, right: 1, top: 0, bottom: 1 };
 
 function loadImage(src) {
   return new Promise((resolve, reject) => {
@@ -23,6 +27,18 @@ function loadImage(src) {
     img.onerror = reject;
     img.src = src;
   });
+}
+
+// Resolves fractional card bounds into an absolute pixel box within a
+// canvas/image of the given width/height.
+function boundsToPx(bounds, width, height) {
+  const b = bounds || FULL_BOUNDS;
+  return {
+    x: b.left * width,
+    y: b.top * height,
+    w: (b.right - b.left) * width,
+    h: (b.bottom - b.top) * height,
+  };
 }
 
 function drawImageContain(ctx, img, dx, dy, dw, dh) {
@@ -35,41 +51,69 @@ function drawImageContain(ctx, img, dx, dy, dw, dh) {
   return { x, y, w, h };
 }
 
-function drawCenteringGuides(ctx, rect, borders) {
-  if (!borders) return;
-  const x1 = rect.x + borders.left * rect.w;
-  const x2 = rect.x + borders.right * rect.w;
-  const y1 = rect.y + borders.top * rect.h;
-  const y2 = rect.y + borders.bottom * rect.h;
-  ctx.save();
-  ctx.strokeStyle = 'rgba(0,229,255,0.95)';
-  ctx.lineWidth = 2;
-  ctx.setLineDash([6, 4]);
-  [x1, x2].forEach((x) => {
-    ctx.beginPath(); ctx.moveTo(x, rect.y); ctx.lineTo(x, rect.y + rect.h); ctx.stroke();
-  });
-  [y1, y2].forEach((y) => {
-    ctx.beginPath(); ctx.moveTo(rect.x, y); ctx.lineTo(rect.x + rect.w, y); ctx.stroke();
-  });
-  ctx.restore();
+// Same as drawImageContain but draws only a source sub-rectangle (the
+// detected card region) rather than the whole source image — a photo often
+// has background margin around the card, and using the whole canvas here
+// would show the card small in a sea of background instead of filling the
+// frame.
+function drawImageRegionContain(ctx, img, srcBox, dx, dy, dw, dh) {
+  const scale = Math.min(dw / srcBox.w, dh / srcBox.h);
+  const w = srcBox.w * scale;
+  const h = srcBox.h * scale;
+  const x = dx + (dw - w) / 2;
+  const y = dy + (dh - h) / 2;
+  ctx.drawImage(img, srcBox.x, srcBox.y, srcBox.w, srcBox.h, x, y, w, h);
+  return { x, y, w, h };
 }
 
-function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
+// Draws the outer + inner centering guide lines, remapped from full-image
+// fractions into the coordinate space of the (possibly cropped-to-card)
+// drawn rect.
+function drawCenteringGuides(ctx, rect, borders, cardBounds) {
+  if (!borders) return;
+  const cb = cardBounds || FULL_BOUNDS;
+  const mapX = (frac) => rect.x + ((frac - cb.left) / (cb.right - cb.left)) * rect.w;
+  const mapY = (frac) => rect.y + ((frac - cb.top) / (cb.bottom - cb.top)) * rect.h;
+
+  function drawSet(b, color, lineWidth) {
+    const x1 = mapX(b.left), x2 = mapX(b.right);
+    const y1 = mapY(b.top), y2 = mapY(b.bottom);
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lineWidth;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath(); ctx.moveTo(x1, rect.y); ctx.lineTo(x1, rect.y + rect.h); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x2, rect.y); ctx.lineTo(x2, rect.y + rect.h); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(rect.x, y1); ctx.lineTo(rect.x + rect.w, y1); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(rect.x, y2); ctx.lineTo(rect.x + rect.w, y2); ctx.stroke();
+    ctx.restore();
+  }
+
+  if (borders.outer) drawSet(borders.outer, 'rgba(0,229,255,0.9)', 2);
+  if (borders.inner) drawSet(borders.inner, 'rgba(255,46,166,0.95)', 3);
+}
+
+function wrapLines(ctx, text, maxWidth) {
   const words = text.split(' ');
+  const lines = [];
   let line = '';
-  let curY = y;
   for (const word of words) {
     const test = line ? `${line} ${word}` : word;
     if (ctx.measureText(test).width > maxWidth && line) {
-      ctx.fillText(line, x, curY);
+      lines.push(line);
       line = word;
-      curY += lineHeight;
     } else {
       line = test;
     }
   }
-  if (line) ctx.fillText(line, x, curY);
-  return curY + lineHeight;
+  if (line) lines.push(line);
+  return lines;
+}
+
+function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
+  const lines = wrapLines(ctx, text, maxWidth);
+  lines.forEach((line, i) => ctx.fillText(line, x, y + i * lineHeight));
+  return y + lines.length * lineHeight;
 }
 
 function roundRect(ctx, x, y, w, h, r) {
@@ -89,26 +133,29 @@ function scoreColor(score) {
   return COLORS.poor;
 }
 
-// Shared geometry for a card-side section, derived from the canvas's own
-// aspect ratio so the main image fills its column width instead of being
-// height-constrained and letterboxed.
-function sectionLayout(canvas) {
+// Shared geometry for a card-side section, derived from the CARD region's
+// own aspect ratio (not the full canvas, which may include background
+// margin) so the main image fills its column width instead of being
+// letterboxed by extra background.
+function sectionLayout(canvas, cardBounds) {
+  const box = boundsToPx(cardBounds, canvas.width, canvas.height);
   const sectionW = WIDTH - PAD * 2;
   const labelH = 40;
   const gap = 10;
   const cornerColW = sectionW * 0.22;
   const mainColW = sectionW - cornerColW * 2 - gap * 2;
-  const mainColH = mainColW * (canvas.height / canvas.width);
+  const mainColH = mainColW * (box.h / box.w);
   const cornerCellH = (mainColH - gap) / 2;
-  return { sectionW, labelH, gap, cornerColW, mainColW, mainColH, cornerCellH, totalH: labelH + mainColH };
+  return { sectionW, labelH, gap, cornerColW, mainColW, mainColH, cornerCellH, totalH: labelH + mainColH, box };
 }
 
 // Draws one card-side section (FRONT or BACK): corner crops flanking the
 // full image with centering guide lines overlaid, matching the layout of
 // well-known pre-grade report generators but reusing our own crop/measure
-// pipeline.
-function drawCardSection(ctx, { label, y, canvas, borders }) {
-  const { labelH, gap, cornerColW, mainColW, mainColH, cornerCellH } = sectionLayout(canvas);
+// pipeline. Everything is cropped relative to the detected card bounds so a
+// photo with background margin doesn't end up mostly showing background.
+function drawCardSection(ctx, { label, y, canvas, borders, cardBounds }) {
+  const { labelH, gap, cornerColW, mainColW, mainColH, cornerCellH, box } = sectionLayout(canvas, cardBounds);
 
   ctx.fillStyle = COLORS.border;
   ctx.font = 'bold 20px -apple-system, sans-serif';
@@ -120,39 +167,44 @@ function drawCardSection(ctx, { label, y, canvas, borders }) {
   const mainX = leftX + cornerColW + gap;
   const rightX = mainX + mainColW + gap;
 
-  const crops = generateCornerCrops(canvas);
+  const crops = generateCornerCrops(canvas, cardBounds);
   const byKey = Object.fromEntries(crops.map((c) => [c.key, c]));
 
-  function drawCropCell(img, x, cy, label2) {
+  function drawCropCell(img, x, cy, captionKey) {
     roundRect(ctx, x, cy, cornerColW, cornerCellH, 6);
     ctx.save();
     ctx.clip();
     ctx.fillStyle = '#000';
     ctx.fillRect(x, cy, cornerColW, cornerCellH);
     drawImageContain(ctx, img, x, cy, cornerColW, cornerCellH);
+    // Caption drawn as an overlay strip INSIDE the cell (not below it) so it
+    // can never be clipped/overlapped by the next cell's border.
+    const stripH = 16;
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.fillRect(x, cy + cornerCellH - stripH, cornerColW, stripH);
+    ctx.fillStyle = '#fff';
+    ctx.font = '9px -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(t(captionKey), x + cornerColW / 2, cy + cornerCellH - stripH / 2 + 3);
     ctx.restore();
     ctx.strokeStyle = COLORS.border;
     ctx.lineWidth = 1;
     roundRect(ctx, x, cy, cornerColW, cornerCellH, 6);
     ctx.stroke();
-    ctx.fillStyle = COLORS.muted;
-    ctx.font = '10px -apple-system, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(label2, x + cornerColW / 2, cy + cornerCellH + 13);
   }
 
-  drawCropCell(byKey.tl.canvas, leftX, contentY, t('corner_tl'));
-  drawCropCell(byKey.bl.canvas, leftX, contentY + cornerCellH + gap, t('corner_bl'));
-  drawCropCell(byKey.tr.canvas, rightX, contentY, t('corner_tr'));
-  drawCropCell(byKey.br.canvas, rightX, contentY + cornerCellH + gap, t('corner_br'));
+  drawCropCell(byKey.tl.canvas, leftX, contentY, 'corner_tl');
+  drawCropCell(byKey.bl.canvas, leftX, contentY + cornerCellH + gap, 'corner_bl');
+  drawCropCell(byKey.tr.canvas, rightX, contentY, 'corner_tr');
+  drawCropCell(byKey.br.canvas, rightX, contentY + cornerCellH + gap, 'corner_br');
 
   roundRect(ctx, mainX, contentY, mainColW, mainColH, 6);
   ctx.save();
   ctx.clip();
   ctx.fillStyle = '#000';
   ctx.fillRect(mainX, contentY, mainColW, mainColH);
-  const rect = drawImageContain(ctx, canvas, mainX, contentY, mainColW, mainColH);
-  drawCenteringGuides(ctx, rect, borders);
+  const rect = drawImageRegionContain(ctx, canvas, box, mainX, contentY, mainColW, mainColH);
+  drawCenteringGuides(ctx, rect, borders, cardBounds);
   ctx.restore();
   ctx.strokeStyle = COLORS.border;
   ctx.lineWidth = 1;
@@ -185,25 +237,32 @@ export async function generateReportImage({
   game, cardName, setName, cardNumber,
   frontCanvas, backCanvas,
   frontBorders, backBorders,
+  frontCardBounds, backCardBounds,
   centering, cornersScore, surfaceScore, edgesScore,
   companies, defects, timestamp,
 }) {
   const logo = await loadImage('img/logo-white.png');
 
-  // Pre-measure defect thumbnails (each is a small canvas render) so we know
-  // total height before allocating the final canvas.
+  // Pre-measure text that can vary in wrapped line count (length differs a
+  // lot between languages) so the canvas is allocated tall enough — sizing
+  // this from a fixed guess previously clipped the footer off the bottom.
+  const measureCtx = document.createElement('canvas').getContext('2d');
+  const footerTextMaxW = WIDTH - PAD * 2 - 40;
+  measureCtx.font = '11px -apple-system, sans-serif';
+  const disclaimerLines = wrapLines(measureCtx, t('disclaimer'), footerTextMaxW);
+
   const defectList = defects || [];
   const defCols = 2;
-  const defRowH = 96;
+  const defRowH = 140;
   const defRows = Math.ceil(defectList.length / defCols);
   const defectsSectionH = defectList.length ? 50 + defRows * (defRowH + 10) + 10 : 0;
 
   const headerH = 190;
   const sectionGap = 24;
-  const frontSectionH = sectionLayout(frontCanvas).totalH + sectionGap;
-  const backSectionH = sectionLayout(backCanvas).totalH + sectionGap;
+  const frontSectionH = sectionLayout(frontCanvas, frontCardBounds).totalH + sectionGap;
+  const backSectionH = sectionLayout(backCanvas, backCardBounds).totalH + sectionGap;
   const statsH = 140;
-  const footerH = 100;
+  const footerH = disclaimerLines.length * 14 + 50;
 
   const totalH = headerH + frontSectionH + backSectionH + statsH + defectsSectionH + footerH + PAD;
 
@@ -239,8 +298,8 @@ export async function generateReportImage({
   let y = headerH;
 
   // ---- Front / Back sections ----
-  y = drawCardSection(ctx, { label: t('front').toUpperCase(), y, canvas: frontCanvas, borders: frontBorders });
-  y = drawCardSection(ctx, { label: t('back').toUpperCase(), y, canvas: backCanvas, borders: backBorders });
+  y = drawCardSection(ctx, { label: t('front').toUpperCase(), y, canvas: frontCanvas, borders: frontBorders, cardBounds: frontCardBounds });
+  y = drawCardSection(ctx, { label: t('back').toUpperCase(), y, canvas: backCanvas, borders: backBorders, cardBounds: backCardBounds });
 
   // ---- Sub-score row ----
   const subLabels = [
@@ -288,7 +347,8 @@ export async function generateReportImage({
       ctx.stroke();
 
       const source = d.side === 'back' ? backCanvas : frontCanvas;
-      const thumbDataUrl = cropZoneThumbnail(source, d.zone);
+      const sourceBounds = d.side === 'back' ? backCardBounds : frontCardBounds;
+      const thumbDataUrl = cropZoneThumbnail(source, d.zone, sourceBounds);
       const thumbImg = await loadImage(thumbDataUrl);
       const thumbSize = defRowH - 16;
       ctx.save();
@@ -301,14 +361,14 @@ export async function generateReportImage({
       const textMaxW = cellW - thumbSize - 32;
       ctx.textAlign = 'left';
       ctx.fillStyle = COLORS.border;
-      ctx.font = 'bold 10px -apple-system, sans-serif';
-      ctx.fillText(String(d.category || '').toUpperCase(), textX, cy + 20);
+      ctx.font = 'bold 11px -apple-system, sans-serif';
+      ctx.fillText(String(d.category || '').toUpperCase(), textX, cy + 22);
       ctx.fillStyle = COLORS.text;
-      ctx.font = '12px -apple-system, sans-serif';
-      wrapText(ctx, d.location || '', textX, cy + 36, textMaxW, 14);
+      ctx.font = '13px -apple-system, sans-serif';
+      let ty = wrapText(ctx, d.location || '', textX, cy + 40, textMaxW, 16);
       ctx.fillStyle = COLORS.muted;
-      ctx.font = '11px -apple-system, sans-serif';
-      wrapText(ctx, d.description || '', textX, cy + 64, textMaxW, 13);
+      ctx.font = '12px -apple-system, sans-serif';
+      wrapText(ctx, d.description || '', textX, ty + 6, textMaxW, 15);
     }
     y += defRows * (defRowH + 10) + 20;
   }
@@ -317,8 +377,8 @@ export async function generateReportImage({
   ctx.textAlign = 'center';
   ctx.fillStyle = COLORS.muted;
   ctx.font = '11px -apple-system, sans-serif';
-  wrapText(ctx, t('disclaimer'), WIDTH / 2 - 300, y, 600, 14);
-  y += 34;
+  y = wrapText(ctx, t('disclaimer'), WIDTH / 2, y, footerTextMaxW, 14);
+  y += 20;
   ctx.fillStyle = COLORS.border;
   ctx.font = 'bold 12px -apple-system, sans-serif';
   ctx.fillText(t('generated_by')(timestamp), WIDTH / 2, y);
