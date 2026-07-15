@@ -36,7 +36,14 @@ function setupUpload(side, dropId, inputId, previewId, errorId) {
   const preview = document.getElementById(previewId);
   const errorEl = document.getElementById(errorId);
 
-  drop.addEventListener('click', () => input.click());
+  // No explicit click-to-open-picker handler needed here: `drop` is a
+  // <label> directly wrapping `input`, so tapping/clicking it already
+  // natively opens the file picker. An earlier version also called
+  // input.click() manually on top of that native behavior, double-triggering
+  // the picker on every tap — harmless on desktop, but on iOS the native
+  // photo-picker session is fragile enough that the second trigger could
+  // silently discard the selection just made, so `change` never fired with
+  // a file (matches "the picker opens fine, but nothing happens after").
   drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('is-dragover'); });
   drop.addEventListener('dragleave', () => drop.classList.remove('is-dragover'));
   drop.addEventListener('drop', (e) => {

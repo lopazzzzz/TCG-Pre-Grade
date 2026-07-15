@@ -1,36 +1,52 @@
 import { WORK_MAX_DIMENSION, CORNER_CROP_FRACTION } from './config.js';
 
+function withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('image decode timed out')), ms)),
+  ]);
+}
+
+// Reads via FileReader -> data URL rather than URL.createObjectURL — blob
+// URLs backing an <img> src have a history of WebKit-specific bugs for Files
+// sourced from a native photo/camera picker (the load silently never fires,
+// neither onload nor onerror), whereas readAsDataURL is one of the oldest,
+// most consistently-supported File API paths across mobile browsers.
 function loadImageElement(file) {
   return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      if (img.naturalWidth > 0 && img.naturalHeight > 0) resolve(img);
-      else reject(new Error('unreadable image file (zero dimensions)'));
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        if (img.naturalWidth > 0 && img.naturalHeight > 0) resolve(img);
+        else reject(new Error('unreadable image file (zero dimensions)'));
+      };
+      img.onerror = () => reject(new Error('unreadable image file'));
+      img.src = reader.result;
     };
-    img.onerror = () => reject(new Error('unreadable image file'));
-    img.src = URL.createObjectURL(file);
+    reader.onerror = () => reject(new Error('could not read file'));
+    reader.readAsDataURL(file);
   });
 }
 
 // Tries createImageBitmap first — it goes through the browser's native image
-// decoder more directly than an <img> + object URL, which some mobile
-// browsers handle more reliably for certain formats. Falls back to the
-// classic <img> approach for browsers/formats where that isn't available.
-// Some browsers don't reject createImageBitmap for a format they can't
-// actually decode — they resolve with a degenerate (0x0) bitmap instead —
-// so a zero-dimension result is treated the same as a thrown error and
-// falls through to the <img> path rather than silently "succeeding" with
-// nothing to show.
+// decoder more directly, which some mobile browsers handle more reliably for
+// certain formats. Falls back to the classic <img>-via-FileReader approach
+// for browsers/formats where that isn't available. Some browsers don't
+// reject createImageBitmap for a format they can't actually decode — they
+// resolve with a degenerate (0x0) bitmap instead, or in rare cases never
+// settle the promise at all — so a zero-dimension result and a hang are both
+// treated the same as a thrown error and fall through to the <img> path.
 export async function loadImageFromFile(file) {
   if (typeof createImageBitmap === 'function') {
     try {
-      const bitmap = await createImageBitmap(file);
+      const bitmap = await withTimeout(createImageBitmap(file), 4000);
       if (bitmap.width > 0 && bitmap.height > 0) return bitmap;
     } catch {
       // fall through
     }
   }
-  return loadImageElement(file);
+  return withTimeout(loadImageElement(file), 8000);
 }
 
 // Draws the image onto a canvas at a capped working resolution, preserving
