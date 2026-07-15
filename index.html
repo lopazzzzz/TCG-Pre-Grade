@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>TCG Pre-Grade</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="app-header">
+  <h1 class="app-header__title">TCG Pre-Grade</h1>
+  <nav class="app-header__nav">
+    <a href="index.html" class="app-header__link is-active">New Pre-Grade</a>
+    <a href="history.html" class="app-header__link">History</a>
+  </nav>
+</header>
+
+<main class="app-main">
+
+  <section class="panel" id="panel-info">
+    <h2 class="panel__title">1. Card details</h2>
+    <div class="game-select">
+      <button type="button" class="game-btn is-active" data-game="pokemon">Pokemon TCG</button>
+      <button type="button" class="game-btn" data-game="onepiece">One Piece TCG</button>
+    </div>
+    <div class="field-row">
+      <input type="text" id="card-name" placeholder="Card name (optional)">
+      <input type="text" id="set-name" placeholder="Set (optional)">
+      <input type="text" id="card-number" placeholder="Card # (optional)">
+    </div>
+  </section>
+
+  <section class="panel" id="panel-upload">
+    <h2 class="panel__title">2. Upload front &amp; back photos</h2>
+    <p class="panel__hint">ถ่ายรูปการ์ดให้เต็มเฟรม ไม่ต้องมีพื้นหลังเยอะ เพื่อความแม่นยำของการวัด Centering</p>
+    <div class="upload-row">
+      <label class="upload-drop" id="front-drop">
+        <input type="file" accept="image/*" capture="environment" id="front-input" hidden>
+        <img class="upload-drop__preview" id="front-preview" hidden>
+        <span class="upload-drop__label">Front photo</span>
+      </label>
+      <label class="upload-drop" id="back-drop">
+        <input type="file" accept="image/*" capture="environment" id="back-input" hidden>
+        <img class="upload-drop__preview" id="back-preview" hidden>
+        <span class="upload-drop__label">Back photo</span>
+      </label>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-centering" hidden>
+    <h2 class="panel__title">3. Centering measurement</h2>
+    <p class="panel__hint">เส้นสีเหลืองคือขอบในที่ตรวจจับอัตโนมัติ — ลากปรับได้ถ้าไม่ตรง</p>
+    <div class="centering-row">
+      <div class="centering-col">
+        <div class="centering-col__label">Front</div>
+        <canvas id="front-centering-canvas" class="centering-canvas"></canvas>
+        <div class="centering-ratios">
+          <span>L/R <b id="front-ratio-lr">-</b></span>
+          <span>T/B <b id="front-ratio-tb">-</b></span>
+        </div>
+        <button type="button" class="btn-secondary btn-small" id="front-reset-btn">Re-detect</button>
+      </div>
+      <div class="centering-col">
+        <div class="centering-col__label">Back</div>
+        <canvas id="back-centering-canvas" class="centering-canvas"></canvas>
+        <div class="centering-ratios">
+          <span>L/R <b id="back-ratio-lr">-</b></span>
+          <span>T/B <b id="back-ratio-tb">-</b></span>
+        </div>
+        <button type="button" class="btn-secondary btn-small" id="back-reset-btn">Re-detect</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-xray" hidden>
+    <h2 class="panel__title">4. Light / X-ray inspection tool</h2>
+    <p class="panel__hint">ปรับแสงเพื่อตรวจสอบ Surface ด้วยตาตัวเอง — ลากตรงกลางภาพเพื่อเทียบมุมมองปกติ vs. enhanced</p>
+    <div class="xray-select">
+      <button type="button" class="xray-btn is-active" data-side="front">Front</button>
+      <button type="button" class="xray-btn" data-side="back">Back</button>
+    </div>
+    <div id="compare-container" class="compare-slider"></div>
+    <div class="sliders">
+      <label>Brightness <input type="range" id="brightness-slider" min="-40" max="40" value="0"></label>
+      <label>Contrast <input type="range" id="contrast-slider" min="-40" max="40" value="0"></label>
+      <label>Exposure <input type="range" id="exposure-slider" min="-40" max="40" value="0"></label>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-analyze" hidden>
+    <h2 class="panel__title">5. AI analysis</h2>
+    <button type="button" class="btn-primary" id="analyze-btn">Analyze with AI</button>
+    <p class="loading" id="analyze-loading" hidden>Analyzing… this can take up to ~20s</p>
+    <p class="error" id="analyze-error" hidden></p>
+
+    <div id="results-container"></div>
+
+    <div id="save-section" hidden>
+      <textarea id="notes-input" placeholder="Notes (optional)"></textarea>
+      <button type="button" class="btn-primary" id="save-btn">Save to history</button>
+      <p class="save-status" id="save-status"></p>
+    </div>
+  </section>
+
+</main>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
