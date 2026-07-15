@@ -19,7 +19,13 @@
 <style>
   .admin-login { max-width: 360px; margin: 15vh auto 0; }
   .admin-login input { width: 100%; margin-bottom: 12px; }
-  .admin-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .admin-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 16px; }
+  .admin-toolbar__actions { display: flex; gap: 8px; }
+  .admin-bulk-bar { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; flex-wrap: wrap; }
+  .admin-bulk-bar__all { display: flex; align-items: center; gap: 6px; font-size: 0.88rem; cursor: pointer; }
+  .btn-danger { background: transparent; color: var(--poor); border: 1px solid var(--poor); }
+  .btn-danger:hover:not(:disabled) { background: color-mix(in srgb, var(--poor) 12%, transparent); }
+  .btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
   .admin-list { display: flex; flex-direction: column; gap: 10px; }
   .admin-row {
     display: flex; align-items: center; gap: 14px;
@@ -27,6 +33,7 @@
     padding: 12px 14px; background: var(--surface-alt); cursor: pointer;
     text-align: left; width: 100%; font-family: inherit;
   }
+  .admin-row__checkbox { width: 18px; height: 18px; flex: none; cursor: pointer; }
   .admin-row__thumb { width: 48px; height: 64px; object-fit: cover; border-radius: 6px; flex: none; background: #000; }
   .admin-row__thumb--empty { background: var(--border); }
   .admin-row__main { flex: 1; min-width: 0; }
@@ -76,7 +83,18 @@
   <section class="panel" id="dashboard-panel" hidden>
     <div class="admin-toolbar">
       <h2 class="panel__title" style="margin:0">Scan Log</h2>
-      <button type="button" class="btn-secondary btn-small" id="logout-btn">Log out</button>
+      <div class="admin-toolbar__actions">
+        <button type="button" class="btn-secondary btn-small" id="select-toggle-btn">Select</button>
+        <button type="button" class="btn-secondary btn-small" id="logout-btn">Log out</button>
+      </div>
+    </div>
+    <div class="admin-bulk-bar" id="admin-bulk-bar" hidden>
+      <label class="admin-bulk-bar__all">
+        <input type="checkbox" id="select-all-checkbox">
+        Select all
+      </label>
+      <button type="button" class="btn-danger btn-small" id="delete-selected-btn" disabled>Delete selected (0)</button>
+      <button type="button" class="btn-secondary btn-small" id="cancel-select-btn">Cancel</button>
     </div>
     <div id="admin-list" class="admin-list"></div>
     <p class="empty-state" id="admin-empty" style="display:none">No scans logged yet.</p>

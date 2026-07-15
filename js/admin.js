@@ -15,6 +15,15 @@ const emptyEl = document.getElementById('admin-empty');
 const modal = document.getElementById('detail-modal');
 const modalBody = document.getElementById('detail-body');
 const modalClose = document.getElementById('detail-close');
+const selectToggleBtn = document.getElementById('select-toggle-btn');
+const bulkBar = document.getElementById('admin-bulk-bar');
+const selectAllCheckbox = document.getElementById('select-all-checkbox');
+const deleteSelectedBtn = document.getElementById('delete-selected-btn');
+const cancelSelectBtn = document.getElementById('cancel-select-btn');
+
+let lastScans = [];
+let selectionMode = false;
+const selectedIds = new Set();
 
 function showLogin() {
   loginPanel.hidden = false;
@@ -31,12 +40,32 @@ function scoreLine(scan) {
   return ['psa', 'cgc', 'bgs', 'tag'].map(part).filter(Boolean).join(' · ');
 }
 
+function setSelected(id, checked) {
+  if (checked) selectedIds.add(id);
+  else selectedIds.delete(id);
+  updateBulkBar();
+}
+
+function updateBulkBar() {
+  deleteSelectedBtn.textContent = `Delete selected (${selectedIds.size})`;
+  deleteSelectedBtn.disabled = selectedIds.size === 0;
+  selectAllCheckbox.checked = lastScans.length > 0 && selectedIds.size === lastScans.length;
+}
+
+function setSelectionMode(on) {
+  selectionMode = on;
+  selectToggleBtn.hidden = on;
+  bulkBar.hidden = !on;
+  if (!on) selectedIds.clear();
+  renderList();
+}
+
 function row(scan) {
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'admin-row';
+  const wrap = document.createElement('div');
+  wrap.className = 'admin-row';
   const when = new Date(scan.createdAt).toLocaleString();
-  btn.innerHTML = `
+  wrap.innerHTML = `
+    <input type="checkbox" class="admin-row__checkbox" ${selectionMode ? '' : 'hidden'}>
     ${scan.frontThumb ? `<img class="admin-row__thumb" src="${scan.frontThumb}" alt="">` : '<div class="admin-row__thumb admin-row__thumb--empty"></div>'}
     <div class="admin-row__main">
       <div class="admin-row__title">${scan.cardName || 'Untitled card'} <span style="font-weight:400;color:var(--text-muted)">— ${GAME_LABELS[scan.game] || scan.game}</span></div>
@@ -44,8 +73,32 @@ function row(scan) {
       <div class="admin-row__scores">${scoreLine(scan)}</div>
     </div>
   `;
-  btn.addEventListener('click', () => openDetail(scan.id));
-  return btn;
+  const checkbox = wrap.querySelector('.admin-row__checkbox');
+  checkbox.checked = selectedIds.has(scan.id);
+  checkbox.addEventListener('click', (evt) => {
+    evt.stopPropagation();
+    setSelected(scan.id, checkbox.checked);
+  });
+  wrap.addEventListener('click', () => {
+    if (selectionMode) {
+      checkbox.checked = !checkbox.checked;
+      setSelected(scan.id, checkbox.checked);
+    } else {
+      openDetail(scan.id);
+    }
+  });
+  return wrap;
+}
+
+function renderList() {
+  listEl.innerHTML = '';
+  if (!lastScans.length) {
+    emptyEl.style.display = 'block';
+    return;
+  }
+  emptyEl.style.display = 'none';
+  lastScans.forEach((scan) => listEl.appendChild(row(scan)));
+  updateBulkBar();
 }
 
 async function loadLogs() {
@@ -58,13 +111,8 @@ async function loadLogs() {
   if (!res.ok) throw new Error(data.error || 'Failed to load logs');
 
   showDashboard();
-  listEl.innerHTML = '';
-  if (!data.scans.length) {
-    emptyEl.style.display = 'block';
-    return;
-  }
-  emptyEl.style.display = 'none';
-  data.scans.forEach((scan) => listEl.appendChild(row(scan)));
+  lastScans = data.scans;
+  renderList();
 }
 
 async function openDetail(id) {
@@ -149,7 +197,34 @@ passwordInput.addEventListener('keydown', (evt) => {
 
 logoutBtn.addEventListener('click', async () => {
   await fetch(`${API_BASE}/admin-logout`, { method: 'POST' });
+  setSelectionMode(false);
   showLogin();
+});
+
+selectToggleBtn.addEventListener('click', () => setSelectionMode(true));
+cancelSelectBtn.addEventListener('click', () => setSelectionMode(false));
+
+selectAllCheckbox.addEventListener('change', () => {
+  if (selectAllCheckbox.checked) lastScans.forEach((s) => selectedIds.add(s.id));
+  else selectedIds.clear();
+  renderList();
+});
+
+deleteSelectedBtn.addEventListener('click', async () => {
+  if (!selectedIds.size) return;
+  if (!confirm(`Delete ${selectedIds.size} selected scan(s) permanently? This cannot be undone.`)) return;
+  deleteSelectedBtn.disabled = true;
+  deleteSelectedBtn.textContent = 'Deleting…';
+  try {
+    await Promise.all([...selectedIds].map((id) => fetch(`${API_BASE}/admin-log-delete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    })));
+  } finally {
+    setSelectionMode(false);
+    await loadLogs();
+  }
 });
 
 loadLogs().catch(() => showLogin());
