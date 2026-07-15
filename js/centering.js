@@ -13,6 +13,8 @@
 // correct either one if the auto-detection gets confused (glare, holo
 // pattern, full-art card with no solid border, etc).
 
+import { createLoupe } from './loupe.js';
+
 function luminance(data, i) {
   return 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
 }
@@ -194,6 +196,7 @@ export function attachBorderEditor(canvas, initialBorders, onChange) {
   }
 
   let dragging = null;
+  const loupe = createLoupe();
 
   function pointerPos(evt) {
     const rect = canvas.getBoundingClientRect();
@@ -206,25 +209,34 @@ export function attachBorderEditor(canvas, initialBorders, onChange) {
   canvas.addEventListener('pointerdown', (evt) => {
     const { x, y } = pointerPos(evt);
     dragging = nearestLine(x, y);
-    if (dragging) canvas.setPointerCapture(evt.pointerId);
+    if (dragging) {
+      canvas.setPointerCapture(evt.pointerId);
+      loupe.show(evt.clientX, evt.clientY, canvas, x, y);
+    }
   });
 
   canvas.addEventListener('pointermove', (evt) => {
     if (!dragging) return;
     const { x, y } = pointerPos(evt);
-    const fx = Math.min(0.49, Math.max(0.01, x / canvas.width));
-    const fy = Math.min(0.49, Math.max(0.01, y / canvas.height));
+    // Each line's own fraction tracks the pointer directly (clamped only to
+    // stay a hair inside the canvas edge and not cross its opposite line) —
+    // previously right/bottom reused the left/top fraction mirrored via
+    // `1 - fx`, which both capped how close the line could get to the true
+    // edge and made it drag backwards relative to the pointer.
+    const fx = x / canvas.width;
+    const fy = y / canvas.height;
     const b = borders[dragging.set];
-    if (dragging.key === 'left') b.left = Math.min(fx, b.right - 0.02);
-    if (dragging.key === 'right') b.right = Math.max(1 - fx, b.left + 0.02);
-    if (dragging.key === 'top') b.top = Math.min(fy, b.bottom - 0.02);
-    if (dragging.key === 'bottom') b.bottom = Math.max(1 - fy, b.top + 0.02);
+    if (dragging.key === 'left') b.left = Math.min(Math.max(fx, 0.01), b.right - 0.02);
+    if (dragging.key === 'right') b.right = Math.max(Math.min(fx, 0.99), b.left + 0.02);
+    if (dragging.key === 'top') b.top = Math.min(Math.max(fy, 0.01), b.bottom - 0.02);
+    if (dragging.key === 'bottom') b.bottom = Math.max(Math.min(fy, 0.99), b.top + 0.02);
     draw();
     onChange(borders);
+    loupe.show(evt.clientX, evt.clientY, canvas, x, y);
   });
 
   ['pointerup', 'pointercancel'].forEach((evtName) => {
-    canvas.addEventListener(evtName, () => { dragging = null; });
+    canvas.addEventListener(evtName, () => { dragging = null; loupe.hide(); });
   });
 
   draw();

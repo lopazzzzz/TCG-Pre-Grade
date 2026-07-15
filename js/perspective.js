@@ -14,6 +14,8 @@
 // For the mild, smooth distortion of a hand-photographed flat card this is
 // visually indistinguishable from a true homography.
 
+import { createLoupe } from './loupe.js';
+
 function solve3x3(A, bVec) {
   const M = A.map((row, i) => [...row, bVec[i]]);
   for (let col = 0; col < 3; col++) {
@@ -157,6 +159,7 @@ export function attachCornerPicker(canvas, initialCorners, onChange) {
   }
 
   let dragging = null;
+  const loupe = createLoupe();
 
   function pointerPos(evt) {
     const rect = canvas.getBoundingClientRect();
@@ -169,7 +172,10 @@ export function attachCornerPicker(canvas, initialCorners, onChange) {
   canvas.addEventListener('pointerdown', (evt) => {
     const { x, y } = pointerPos(evt);
     dragging = nearestCorner(x, y);
-    if (dragging) canvas.setPointerCapture(evt.pointerId);
+    if (dragging) {
+      canvas.setPointerCapture(evt.pointerId);
+      loupe.show(evt.clientX, evt.clientY, canvas, x, y);
+    }
   });
 
   canvas.addEventListener('pointermove', (evt) => {
@@ -181,10 +187,11 @@ export function attachCornerPicker(canvas, initialCorners, onChange) {
     };
     draw();
     onChange(corners);
+    loupe.show(evt.clientX, evt.clientY, canvas, corners[dragging].x, corners[dragging].y);
   });
 
   ['pointerup', 'pointercancel'].forEach((evtName) => {
-    canvas.addEventListener(evtName, () => { dragging = null; });
+    canvas.addEventListener(evtName, () => { dragging = null; loupe.hide(); });
   });
 
   draw();
