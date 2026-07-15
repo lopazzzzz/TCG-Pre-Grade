@@ -152,10 +152,23 @@ export function attachCornerPicker(canvas, initialCorners, onChange) {
     ctx.closePath();
     ctx.stroke();
 
-    ctx.fillStyle = '#ffce45';
+    // Translucent fill + outline ring rather than a solid disc — the hit
+    // target needs to stay big for touch, but a big solid circle hides the
+    // exact card corner underneath it while dragging, right when precision
+    // matters most. A small solid center dot keeps the exact anchor point
+    // visible even through the translucent ring.
     Object.values(corners).forEach((p) => {
+      const r = DOT_CSS_PX * scale;
       ctx.beginPath();
-      ctx.arc(p.x, p.y, DOT_CSS_PX * scale, 0, Math.PI * 2);
+      ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255, 206, 69, 0.25)';
+      ctx.fill();
+      ctx.strokeStyle = '#ffce45';
+      ctx.lineWidth = 2 * scale;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, Math.max(2, r * 0.12), 0, Math.PI * 2);
+      ctx.fillStyle = '#ffce45';
       ctx.fill();
     });
     ctx.restore();
