@@ -218,18 +218,21 @@ export function attachBorderEditor(canvas, initialBorders, onChange) {
   canvas.addEventListener('pointermove', (evt) => {
     if (!dragging) return;
     const { x, y } = pointerPos(evt);
-    // Each line's own fraction tracks the pointer directly (clamped only to
-    // stay a hair inside the canvas edge and not cross its opposite line) —
-    // previously right/bottom reused the left/top fraction mirrored via
-    // `1 - fx`, which both capped how close the line could get to the true
-    // edge and made it drag backwards relative to the pointer.
+    // Each line's own fraction tracks the pointer directly, bounded only by
+    // its opposite line (never fully 0-width) — previously right/bottom
+    // reused the left/top fraction mirrored via `1 - fx`, which both made it
+    // drag backwards relative to the pointer AND, separately, the bound was
+    // clamped to [0.01, 0.99] on all 4 lines. That 1% margin looked harmless
+    // but after Step 3's alignment the card fills the canvas edge-to-edge
+    // (zero background margin), so the true outer edge sits right at 0/1 —
+    // the old margin made it permanently impossible to drag a line there.
     const fx = x / canvas.width;
     const fy = y / canvas.height;
     const b = borders[dragging.set];
-    if (dragging.key === 'left') b.left = Math.min(Math.max(fx, 0.01), b.right - 0.02);
-    if (dragging.key === 'right') b.right = Math.max(Math.min(fx, 0.99), b.left + 0.02);
-    if (dragging.key === 'top') b.top = Math.min(Math.max(fy, 0.01), b.bottom - 0.02);
-    if (dragging.key === 'bottom') b.bottom = Math.max(Math.min(fy, 0.99), b.top + 0.02);
+    if (dragging.key === 'left') b.left = Math.min(Math.max(fx, 0), b.right - 0.02);
+    if (dragging.key === 'right') b.right = Math.max(Math.min(fx, 1), b.left + 0.02);
+    if (dragging.key === 'top') b.top = Math.min(Math.max(fy, 0), b.bottom - 0.02);
+    if (dragging.key === 'bottom') b.bottom = Math.max(Math.min(fy, 1), b.top + 0.02);
     draw();
     onChange(borders);
     loupe.show(evt.clientX, evt.clientY, canvas, x, y);
