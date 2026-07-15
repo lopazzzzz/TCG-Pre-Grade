@@ -26,6 +26,17 @@ export function canvasToDataUrl(canvas, quality = 0.88) {
   return canvas.toDataURL('image/jpeg', quality);
 }
 
+// Small preview image (e.g. for the admin scan-log list) — resized down so
+// embedding it directly in the log's metadata stays cheap.
+export function makeThumbnailDataUrl(canvas, maxWidth = 160) {
+  const scale = Math.min(1, maxWidth / canvas.width);
+  const thumb = document.createElement('canvas');
+  thumb.width = Math.round(canvas.width * scale);
+  thumb.height = Math.round(canvas.height * scale);
+  thumb.getContext('2d').drawImage(canvas, 0, 0, thumb.width, thumb.height);
+  return canvasToDataUrl(thumb, 0.75);
+}
+
 const FULL_BOUNDS = { left: 0, right: 1, top: 0, bottom: 1 };
 
 // Resolves fractional card bounds (as measured by centering.js's outer-edge
@@ -182,12 +193,21 @@ export function cropZoneThumbnail(source, zone, cardBounds) {
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(source, sx, sy, cropW, cropH, 0, 0, out.width, out.height);
 
+  // Two-tone ring (dark halo + bright core) so the marker stays visible
+  // against any card art color/pattern, not just plain backgrounds — a thin
+  // single-color dashed line was getting lost against busy holo/foil art.
   ctx.save();
-  ctx.strokeStyle = '#ff2222';
-  ctx.lineWidth = Math.max(5, out.width * 0.02);
-  ctx.setLineDash([out.width * 0.035, out.width * 0.025]);
+  const rx = out.width * 0.32;
+  const ry = out.height * 0.32;
   ctx.beginPath();
-  ctx.ellipse(out.width / 2, out.height / 2, out.width * 0.34, out.height * 0.34, 0, 0, Math.PI * 2);
+  ctx.ellipse(out.width / 2, out.height / 2, rx, ry, 0, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(0,0,0,0.8)';
+  ctx.lineWidth = Math.max(11, out.width * 0.05);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.ellipse(out.width / 2, out.height / 2, rx, ry, 0, 0, Math.PI * 2);
+  ctx.strokeStyle = '#ff3b3b';
+  ctx.lineWidth = Math.max(6, out.width * 0.028);
   ctx.stroke();
   ctx.restore();
 

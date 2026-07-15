@@ -228,7 +228,7 @@ body {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  background: #000;
+  background: var(--surface-alt);
 }
 .upload-drop__preview[hidden] { display: none; }
 .upload-drop:has(.upload-drop__preview:not([hidden])) .upload-drop__label,
@@ -373,15 +373,15 @@ input[type="range"]::-moz-range-thumb {
 .defects-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .defect-item { display: flex; gap: 14px; font-size: 0.85rem; padding: 12px; border-radius: var(--radius-sm); background: var(--surface-alt); align-items: flex-start; }
 .defect-item__thumb {
-  width: 130px;
-  height: 130px;
+  width: 176px;
+  height: 176px;
   object-fit: cover;
   border-radius: 8px;
   flex: none;
   background: #000;
 }
-@media (max-width: 400px) {
-  .defect-item__thumb { width: 96px; height: 96px; }
+@media (max-width: 480px) {
+  .defect-item__thumb { width: 128px; height: 128px; }
 }
 .defect-item__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .defect-item__category { text-transform: uppercase; font-size: 0.7rem; font-weight: 700; color: var(--text-muted); letter-spacing: 0.03em; }

@@ -37,6 +37,7 @@ function row(scan) {
   btn.className = 'admin-row';
   const when = new Date(scan.createdAt).toLocaleString();
   btn.innerHTML = `
+    ${scan.frontThumb ? `<img class="admin-row__thumb" src="${scan.frontThumb}" alt="">` : '<div class="admin-row__thumb admin-row__thumb--empty"></div>'}
     <div class="admin-row__main">
       <div class="admin-row__title">${scan.cardName || 'Untitled card'} <span style="font-weight:400;color:var(--text-muted)">— ${GAME_LABELS[scan.game] || scan.game}</span></div>
       <div class="admin-row__meta">${when}${scan.ip ? ' · ' + scan.ip : ''}</div>

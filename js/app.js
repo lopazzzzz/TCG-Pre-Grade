@@ -1,4 +1,4 @@
-import { loadImageFromFile, toWorkingCanvas, canvasToDataUrl, generateCornerCrops, applyAdjustments, createCompareSlider } from './imageTools.js';
+import { loadImageFromFile, toWorkingCanvas, canvasToDataUrl, makeThumbnailDataUrl, generateCornerCrops, applyAdjustments, createCompareSlider } from './imageTools.js';
 import { autoDetectBorders, computeRatios, attachBorderEditor } from './centering.js';
 import { defaultCorners, attachCornerPicker, warpQuadToRect } from './perspective.js';
 import { analyzeCard, renderResultsDashboard } from './grading.js';
@@ -200,6 +200,7 @@ document.getElementById('analyze-btn').addEventListener('click', async () => {
         backFull: canvasToDataUrl(state.back.canvas),
         frontCorners: frontCrops.map((c) => c.dataUrl),
         backCorners: backCrops.map((c) => c.dataUrl),
+        frontThumb: makeThumbnailDataUrl(state.front.canvas),
       },
     };
 
