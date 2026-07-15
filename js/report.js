@@ -388,10 +388,3 @@ export async function generateReportImage({
 
   return canvas;
 }
-
-export function downloadCanvasAsImage(canvas, filename) {
-  const link = document.createElement('a');
-  link.download = filename;
-  link.href = canvas.toDataURL('image/png');
-  link.click();
-}

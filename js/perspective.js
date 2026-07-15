@@ -120,7 +120,19 @@ export function attachCornerPicker(canvas, initialCorners, onChange) {
     tl: { ...initialCorners.tl }, tr: { ...initialCorners.tr },
     bl: { ...initialCorners.bl }, br: { ...initialCorners.br },
   };
-  const HIT_PX = 22;
+  // Hit tolerance and dot radius are expressed in target CSS px and
+  // converted to the canvas's internal pixel space at use time — a fixed
+  // internal-pixel radius shrinks to a much smaller, harder-to-tap target
+  // on phones, where the canvas is displayed at a fraction of its internal
+  // resolution (touch needs a comfortably large target; a mouse cursor
+  // doesn't need nearly as much).
+  const HIT_CSS_PX = 34;
+  const DOT_CSS_PX = 15;
+
+  function cssToInternalScale() {
+    const rect = canvas.getBoundingClientRect();
+    return rect.width ? canvas.width / rect.width : 1;
+  }
 
   function draw() {
     const ctx = canvas.getContext('2d');
@@ -128,6 +140,7 @@ export function attachCornerPicker(canvas, initialCorners, onChange) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
+    const scale = cssToInternalScale();
     ctx.save();
     ctx.strokeStyle = '#ffce45';
     ctx.lineWidth = 2;
@@ -142,20 +155,21 @@ export function attachCornerPicker(canvas, initialCorners, onChange) {
     ctx.fillStyle = '#ffce45';
     Object.values(corners).forEach((p) => {
       ctx.beginPath();
-      ctx.arc(p.x, p.y, 9, 0, Math.PI * 2);
+      ctx.arc(p.x, p.y, DOT_CSS_PX * scale, 0, Math.PI * 2);
       ctx.fill();
     });
     ctx.restore();
   }
 
   function nearestCorner(px, py) {
+    const hitPx = HIT_CSS_PX * cssToInternalScale();
     let best = null;
     let bestDist = Infinity;
     for (const key of ['tl', 'tr', 'bl', 'br']) {
       const d = dist(corners[key], { x: px, y: py });
       if (d < bestDist) { bestDist = d; best = key; }
     }
-    return bestDist <= HIT_PX ? best : null;
+    return bestDist <= hitPx ? best : null;
   }
 
   let dragging = null;

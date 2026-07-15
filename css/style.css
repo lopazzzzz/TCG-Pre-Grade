@@ -450,3 +450,39 @@ input[type="range"]::-moz-range-thumb {
 .app-footer__contact { margin: 0; font-size: 0.82rem; color: var(--text-muted); }
 .app-footer__contact a { color: var(--text-muted); text-decoration: underline; }
 .app-footer__contact a:hover { color: var(--accent-dark); }
+
+.report-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: none;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 24px 12px;
+  overflow-y: auto;
+  z-index: 200;
+}
+.report-modal.is-open { display: flex; }
+.report-modal__panel {
+  background: var(--panel-bg);
+  border-radius: var(--radius);
+  padding: 20px;
+  max-width: 480px;
+  width: 100%;
+  position: relative;
+  box-shadow: var(--shadow-md);
+  text-align: center;
+}
+.report-modal__close {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  border: none;
+  background: none;
+  font-size: 1.6rem;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--text-muted);
+}
+.report-modal__img { width: 100%; border-radius: var(--radius-sm); margin-bottom: 12px; -webkit-touch-callout: default; }
+.report-modal__hint { font-size: 0.85rem; color: var(--text-muted); margin: 0 0 14px; }

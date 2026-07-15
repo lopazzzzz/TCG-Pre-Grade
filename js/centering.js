@@ -153,13 +153,22 @@ export function attachBorderEditor(canvas, initialBorders, onChange) {
     outer: { ...initialBorders.outer },
     inner: { ...initialBorders.inner },
   };
-  const HIT_PX = 16;
+  // Expressed in target CSS px, converted to the canvas's internal pixel
+  // space at use time — a fixed internal-pixel tolerance/line-width shrinks
+  // to a much smaller, harder-to-tap target on phones, where the canvas is
+  // displayed at a fraction of its internal resolution.
+  const HIT_CSS_PX = 30;
 
-  function drawSet(ctx, b, color, lineWidth, dash) {
+  function cssToInternalScale() {
+    const rect = canvas.getBoundingClientRect();
+    return rect.width ? canvas.width / rect.width : 1;
+  }
+
+  function drawSet(ctx, b, color, lineWidthCssPx, dash, scale) {
     ctx.save();
     ctx.strokeStyle = color;
-    ctx.lineWidth = lineWidth;
-    ctx.setLineDash(dash);
+    ctx.lineWidth = lineWidthCssPx * scale;
+    ctx.setLineDash(dash.map((v) => v * scale));
     const x1 = b.left * canvas.width;
     const x2 = b.right * canvas.width;
     const y1 = b.top * canvas.height;
@@ -176,11 +185,13 @@ export function attachBorderEditor(canvas, initialBorders, onChange) {
     const img = canvas._sourceImage;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    drawSet(ctx, borders.outer, OUTER_COLOR, 2, [6, 4]);
-    drawSet(ctx, borders.inner, INNER_COLOR, 3, [3, 3]);
+    const scale = cssToInternalScale();
+    drawSet(ctx, borders.outer, OUTER_COLOR, 2.5, [6, 4], scale);
+    drawSet(ctx, borders.inner, INNER_COLOR, 3.5, [3, 3], scale);
   }
 
   function nearestLine(px, py) {
+    const hitPx = HIT_CSS_PX * cssToInternalScale();
     const candidates = [];
     for (const set of ['outer', 'inner']) {
       const b = borders[set];
@@ -192,7 +203,7 @@ export function attachBorderEditor(canvas, initialBorders, onChange) {
       candidates.push({ set, key: 'bottom', dist: Math.abs(py - y2) });
     }
     candidates.sort((a, b) => a.dist - b.dist);
-    return candidates[0].dist <= HIT_PX ? candidates[0] : null;
+    return candidates[0].dist <= hitPx ? candidates[0] : null;
   }
 
   let dragging = null;

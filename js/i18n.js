@@ -45,7 +45,9 @@ export const translations = {
     upload_read_error: 'ไม่สามารถอ่านไฟล์รูปนี้ได้ ลองเลือกรูปอื่น หรือถ่ายภาพใหม่อีกครั้ง',
     save_image_btn: '💾 บันทึกเป็นรูปภาพ',
     saving_image: 'กำลังสร้างภาพ…',
-    saved_image: 'บันทึกภาพแล้ว ✓',
+    saved_image: 'สร้างภาพแล้ว ✓',
+    save_image_hint: 'กดค้างที่รูปด้านบนแล้วเลือก "บันทึกลงรูปภาพ" เพื่อบันทึกลงคลังภาพในเครื่อง',
+    download_btn: 'ดาวน์โหลด',
 
     centering: 'Centering',
     corners: 'Corners',
@@ -113,7 +115,9 @@ export const translations = {
     upload_read_error: 'Could not read this photo — try a different one, or take a new photo.',
     save_image_btn: '💾 Save as Image',
     saving_image: 'Generating image…',
-    saved_image: 'Image saved ✓',
+    saved_image: 'Image ready ✓',
+    save_image_hint: 'Press and hold the image above and choose "Save to Photos" to save it to your device.',
+    download_btn: 'Download',
 
     centering: 'Centering',
     corners: 'Corners',

@@ -127,22 +127,49 @@ export function generateCornerCrops(canvas, cardBounds) {
 // Applies brightness/contrast/exposure adjustments plus an optional
 // high-contrast "surface enhance" pass (a rough stand-in for the raking-light
 // X-ray view TAG uses) onto a fresh canvas, leaving the source untouched.
+function clamp255(v) {
+  return v < 0 ? 0 : v > 255 ? 255 : v;
+}
+
+// Applies brightness/contrast (as multiplicative %, matching CSS filter
+// semantics: 100% = unchanged) directly on the pixel buffer rather than via
+// the canvas `filter` property — Safari/WebKit has a long history of
+// unreliable or unsupported ctx.filter behavior on canvas (silently drawing
+// the image unmodified), which would make the "enhanced" pass look
+// identical to the normal one. Manual ImageData math has no such gap.
+function applyPercentAdjustments(imageData, { brightnessPct, contrastPct, exposurePct, enhance }) {
+  const d = imageData.data;
+  const bF = brightnessPct / 100;
+  const cF = contrastPct / 100;
+  const eF = exposurePct / 100;
+  for (let i = 0; i < d.length; i += 4) {
+    let r = d[i] * bF, g = d[i + 1] * bF, b = d[i + 2] * bF;
+    r = (r - 128) * cF + 128; g = (g - 128) * cF + 128; b = (b - 128) * cF + 128;
+    r *= eF; g *= eF; b *= eF;
+    if (enhance) {
+      const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+      r = g = b = gray;
+      r = (r - 128) * 2.2 + 128; g = (g - 128) * 2.2 + 128; b = (b - 128) * 2.2 + 128;
+      r *= 1.15; g *= 1.15; b *= 1.15;
+    }
+    d[i] = clamp255(r); d[i + 1] = clamp255(g); d[i + 2] = clamp255(b);
+  }
+}
+
 export function applyAdjustments(sourceCanvas, { brightness = 0, contrast = 0, exposure = 0, enhance = false }) {
   const out = document.createElement('canvas');
   out.width = sourceCanvas.width;
   out.height = sourceCanvas.height;
   const ctx = out.getContext('2d');
+  ctx.drawImage(sourceCanvas, 0, 0);
 
   const brightnessPct = 100 + brightness;
   const contrastPct = 100 + contrast;
   const exposurePct = 100 + exposure * 1.5;
 
-  const filters = [`brightness(${brightnessPct}%)`, `contrast(${contrastPct}%)`, `brightness(${exposurePct}%)`];
-  if (enhance) {
-    filters.push('grayscale(100%)', 'contrast(220%)', 'brightness(115%)');
-  }
-  ctx.filter = filters.join(' ');
-  ctx.drawImage(sourceCanvas, 0, 0);
+  const imageData = ctx.getImageData(0, 0, out.width, out.height);
+  applyPercentAdjustments(imageData, { brightnessPct, contrastPct, exposurePct, enhance });
+  ctx.putImageData(imageData, 0, 0);
   return out;
 }
 
@@ -178,7 +205,9 @@ export function createCompareSlider(container, normalCanvas, enhancedCanvas) {
 
   function setPosition(fraction) {
     const pct = Math.min(100, Math.max(0, fraction * 100));
-    overlay.style.clipPath = `inset(0 ${100 - pct}% 0 0)`;
+    const clipValue = `inset(0 ${100 - pct}% 0 0)`;
+    overlay.style.clipPath = clipValue;
+    overlay.style.webkitClipPath = clipValue;
     handle.style.left = `${pct}%`;
   }
   setPosition(0.5);
