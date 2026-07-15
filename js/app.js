@@ -5,9 +5,11 @@ import { analyzeCard, renderResultsDashboard } from './grading.js';
 import { generateReportImage, downloadCanvasAsImage } from './report.js';
 import { initThemeToggle } from './theme.js';
 import { initDonateCopyButton } from './donate.js';
+import { initLangToggle, t } from './i18n.js';
 
 initThemeToggle();
 initDonateCopyButton();
+initLangToggle();
 
 const state = {
   game: 'pokemon',
@@ -172,7 +174,7 @@ document.getElementById('analyze-btn').addEventListener('click', async () => {
   errorEl.textContent = '';
 
   if (!state.front || !state.back) {
-    errorEl.textContent = 'กรุณาอัปโหลดรูปหน้าและหลังก่อน';
+    errorEl.textContent = t('upload_both_error');
     errorEl.hidden = false;
     return;
   }
@@ -224,7 +226,7 @@ document.getElementById('save-image-btn').addEventListener('click', async () => 
 
   const btn = document.getElementById('save-image-btn');
   btn.disabled = true;
-  statusEl.textContent = 'กำลังสร้างภาพ…';
+  statusEl.textContent = t('saving_image');
 
   try {
     const now = new Date();
@@ -250,10 +252,20 @@ document.getElementById('save-image-btn').addEventListener('click', async () => 
 
     const fileStamp = now.toISOString().replace(/[:.]/g, '-');
     downloadCanvasAsImage(reportCanvas, `cardify-pregrade-${fileStamp}.png`);
-    statusEl.textContent = 'บันทึกภาพแล้ว ✓';
+    statusEl.textContent = t('saved_image');
   } catch (err) {
     statusEl.textContent = `Error: ${err.message}`;
   } finally {
     btn.disabled = false;
   }
+});
+
+// Re-render the results dashboard (built with translated strings baked in)
+// when the language is switched after an analysis already ran.
+document.addEventListener('cardify:langchange', () => {
+  if (!state.lastResult) return;
+  renderResultsDashboard(document.getElementById('results-container'), state.lastResult, {
+    front: state.front.canvas,
+    back: state.back.canvas,
+  });
 });

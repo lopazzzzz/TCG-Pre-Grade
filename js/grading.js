@@ -1,5 +1,6 @@
 import { API_BASE, COMPANY_LABELS } from './config.js';
 import { cropZoneThumbnail } from './imageTools.js';
+import { t } from './i18n.js';
 
 export async function parseJsonResponse(res) {
   const raw = await res.text();
@@ -65,7 +66,7 @@ function defectItem(defect, imageSources) {
       <span class="defect-item__category">${defect.category}</span>
       <span class="defect-item__location">${defect.location}</span>
       <span class="defect-item__desc">${defect.description}</span>
-      ${source ? '<span class="defect-item__approx">circle = approximate area only</span>' : ''}
+      ${source ? `<span class="defect-item__approx">${t('approx_area')}</span>` : ''}
     </div>
   `;
   return el;
@@ -82,11 +83,11 @@ export function renderResultsDashboard(container, result, imageSources) {
 
   const subScores = document.createElement('div');
   subScores.className = 'results-dashboard__subscores';
-  subScores.appendChild(subScoreCard('Centering', result.centering.score,
-    `L/R+T/B worst: ${result.centering.front_ratio} front · ${result.centering.back_ratio} back`));
-  subScores.appendChild(subScoreCard('Corners', result.corners_score));
-  subScores.appendChild(subScoreCard('Surface', result.surface_score));
-  subScores.appendChild(subScoreCard('Edges', result.edges_score));
+  subScores.appendChild(subScoreCard(t('centering'), result.centering.score,
+    `${result.centering.front_ratio} F · ${result.centering.back_ratio} B`));
+  subScores.appendChild(subScoreCard(t('corners'), result.corners_score));
+  subScores.appendChild(subScoreCard(t('surface'), result.surface_score));
+  subScores.appendChild(subScoreCard(t('edges'), result.edges_score));
   container.appendChild(subScores);
 
   if (result.summary) {
@@ -99,7 +100,7 @@ export function renderResultsDashboard(container, result, imageSources) {
   const companyBlock = document.createElement('div');
   companyBlock.className = 'company-table';
   const companyTitle = document.createElement('h3');
-  companyTitle.textContent = 'Estimated grade by company';
+  companyTitle.textContent = t('company_grade_title');
   companyBlock.appendChild(companyTitle);
   ['psa', 'cgc', 'bgs', 'tag'].forEach((key) => {
     companyBlock.appendChild(companyRow(key, result.companies[key]));
@@ -110,7 +111,7 @@ export function renderResultsDashboard(container, result, imageSources) {
     const defectsBlock = document.createElement('div');
     defectsBlock.className = 'defects-block';
     const title = document.createElement('h3');
-    title.textContent = `Flaws noted (${result.defects.length})`;
+    title.textContent = t('flaws_noted')(result.defects.length);
     defectsBlock.appendChild(title);
     const list = document.createElement('ul');
     list.className = 'defects-list';
@@ -121,6 +122,6 @@ export function renderResultsDashboard(container, result, imageSources) {
 
   const disclaimer = document.createElement('p');
   disclaimer.className = 'disclaimer';
-  disclaimer.textContent = 'AI pre-grade estimate for personal reference only — not affiliated with PSA, CGC, BGS, or TAG, and not a guarantee of actual submission results. Physical handling can reveal flaws a photo cannot.';
+  disclaimer.textContent = t('disclaimer');
   container.appendChild(disclaimer);
 }

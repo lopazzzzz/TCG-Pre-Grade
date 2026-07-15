@@ -1,9 +1,6 @@
 {
-  "name": "tcg-pregrade",
+  "name": "cardify",
   "version": "1.0.0",
   "private": true,
-  "description": "Personal Pokemon / One Piece TCG pre-grading tool",
-  "dependencies": {
-    "@anthropic-ai/sdk": "^0.32.1"
-  }
+  "description": "Personal Pokemon / One Piece TCG pre-grading tool"
 }

@@ -1,9 +1,10 @@
 // Grading rubric, prompt construction, and per-grading-company estimate math.
 //
 // Centering is measured geometrically by the client (see js/centering.js) and
-// passed in as ground truth — Claude is only asked to judge Corners/Surface/
-// Edges, which are genuinely visual/subjective calls a vision model is suited
-// for. The per-company overall-grade formulas below are approximations built
+// passed in as ground truth — the vision model is only asked to judge
+// Corners/Surface/Edges, which are genuinely visual/subjective calls a vision
+// model is suited for. The per-company overall-grade formulas below are
+// approximations built
 // from each company's published grading standards:
 //  - BGS publishes its weighted-average formula and Black Label rule, so that
 //    part is a faithful implementation, not a guess.

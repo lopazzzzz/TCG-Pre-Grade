@@ -1,3 +1,5 @@
+import { t } from './i18n.js';
+
 export function initDonateCopyButton() {
   const btn = document.getElementById('copy-account-btn');
   const numberEl = document.getElementById('donate-account-number');
@@ -8,7 +10,7 @@ export function initDonateCopyButton() {
     try {
       await navigator.clipboard.writeText(raw);
       const original = btn.textContent;
-      btn.textContent = 'Copied!';
+      btn.textContent = t('copied');
       btn.disabled = true;
       setTimeout(() => {
         btn.textContent = original;

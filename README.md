@@ -9,13 +9,14 @@ This is an AI-assisted **estimate** for personal reference — it is not
 affiliated with PSA, CGC, BGS, or TAG and does not guarantee actual submission
 results.
 
-## 1. Get an Anthropic API key
+## 1. Get a Gemini API key
 
-1. Go to [console.anthropic.com](https://console.anthropic.com) → API Keys → Create key.
-   This is separate from any claude.ai/Claude Code subscription — it's billed
-   per API call.
-2. Note it down as `ANTHROPIC_API_KEY`. Each card analysis (10 images) costs
-   roughly $0.01–0.05.
+1. Go to [aistudio.google.com/apikey](https://aistudio.google.com/apikey) →
+   sign in with a Google account → **Create API key**.
+2. Note it down as `GEMINI_API_KEY`. The app calls `gemini-2.5-flash-lite`,
+   which has a generous free tier (~1,000 requests/day at time of writing —
+   check [ai.google.dev/gemini-api/docs/rate-limits](https://ai.google.dev/gemini-api/docs/rate-limits)
+   for the current number) — for personal use this is effectively free.
 
 ## 2. Deploy to Netlify
 
@@ -24,7 +25,7 @@ results.
    Build settings are already defined in `netlify.toml` (build command
    `npm install`, functions in `netlify/functions`), so you shouldn't need to
    change anything.
-3. Go to **Site settings → Environment variables** and add `ANTHROPIC_API_KEY`.
+3. Go to **Site settings → Environment variables** and add `GEMINI_API_KEY`.
 4. Deploy. Netlify will give you a URL like `https://<something>.netlify.app` —
    open it on both desktop Chrome and mobile Chrome to confirm everything works
    (camera upload on mobile, drag-and-drop on desktop).
@@ -38,7 +39,7 @@ CLI) run from inside this folder also works, using the same env var set via
 ```
 npm install -g netlify-cli   # once
 cd tcg-pregrade
-netlify env:set ANTHROPIC_API_KEY sk-ant-...
+netlify env:set GEMINI_API_KEY AIza...
 netlify dev
 ```
 
@@ -60,12 +61,13 @@ function server.
    draggable guide lines to correct the auto-detection if needed.
 4. **Light / X-ray tool** lets you slide between a normal and a
    contrast-enhanced view of either side to eyeball surface issues yourself.
-5. **Corners / Surface / Edges** are judged by Claude vision, given the full
-   corrected photos plus 4 auto-generated zoomed corner crops per side.
+5. **Corners / Surface / Edges** are judged by Gemini 2.5 Flash-Lite vision,
+   given the full corrected photos plus 4 auto-generated zoomed corner crops
+   per side.
 6. **Per-company estimates**: BGS uses its publicly documented weighted
    formula; TAG uses its published (tighter) centering tolerance tiers; PSA
    and CGC use a "worst factor gates the grade" heuristic since neither
-   publishes an exact formula — see `netlify/functions/lib/claudePrompt.js`
+   publishes an exact formula — see `netlify/functions/lib/gradingPrompt.js`
    for the full logic and reasoning behind each company's numbers.
    **Confidence %** drops for borderline centering measurements or cards with
    a wide spread between sub-scores, and rises for clearly flawless or

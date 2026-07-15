@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="th">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -13,9 +13,11 @@
 <script>
 (function () {
   try {
-    var saved = localStorage.getItem('tcg-theme');
-    var theme = saved || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    var savedTheme = localStorage.getItem('tcg-theme');
+    var theme = savedTheme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
     document.documentElement.setAttribute('data-theme', theme);
+    var savedLang = localStorage.getItem('cardify-lang');
+    document.documentElement.setAttribute('lang', savedLang || 'th');
   } catch (e) {}
 })();
 </script>
@@ -23,149 +25,152 @@
 </head>
 <body>
 <header class="app-header">
-  <h1 class="app-header__title">
+  <div class="app-header__title">
     <img src="img/logo-black.png" alt="Cardify" class="app-header__logo app-header__logo--light">
     <img src="img/logo-white.png" alt="Cardify" class="app-header__logo app-header__logo--dark">
-  </h1>
+  </div>
   <nav class="app-header__nav">
-    <button type="button" id="theme-toggle" class="theme-toggle" aria-label="Toggle dark mode">🌙</button>
+    <button type="button" id="lang-toggle" class="pill-toggle" aria-label="Switch language">TH</button>
+    <button type="button" id="theme-toggle" class="icon-toggle" aria-label="Toggle dark mode">🌙</button>
   </nav>
 </header>
 
 <main class="app-main">
 
   <section class="panel" id="panel-info">
-    <h2 class="panel__title">1. Card details</h2>
+    <h2 class="panel__title"><span class="step-badge">1</span><span data-i18n="step1_title">Card details</span></h2>
     <div class="game-select">
-      <button type="button" class="game-btn is-active" data-game="pokemon">Pokemon TCG</button>
-      <button type="button" class="game-btn" data-game="onepiece">One Piece TCG</button>
+      <button type="button" class="game-btn is-active" data-game="pokemon" data-i18n="game_pokemon">Pokemon TCG</button>
+      <button type="button" class="game-btn" data-game="onepiece" data-i18n="game_onepiece">One Piece TCG</button>
     </div>
     <div class="field-row">
-      <input type="text" id="card-name" placeholder="Card name (optional)">
-      <input type="text" id="set-name" placeholder="Set (optional)">
-      <input type="text" id="card-number" placeholder="Card # (optional)">
+      <input type="text" id="card-name" data-i18n-placeholder="placeholder_card_name" placeholder="Card name (optional)">
+      <input type="text" id="set-name" data-i18n-placeholder="placeholder_set_name" placeholder="Set (optional)">
+      <input type="text" id="card-number" data-i18n-placeholder="placeholder_card_number" placeholder="Card # (optional)">
     </div>
   </section>
 
   <section class="panel" id="panel-upload">
-    <h2 class="panel__title">2. Upload front &amp; back photos</h2>
-    <p class="panel__hint">ถ่ายรูปการ์ดให้เต็มเฟรม ไม่ต้องมีพื้นหลังเยอะ เพื่อความแม่นยำของการวัด Centering</p>
+    <h2 class="panel__title"><span class="step-badge">2</span><span data-i18n="step2_title">Upload front &amp; back photos</span></h2>
+    <p class="panel__hint" data-i18n="step2_hint">Photograph the card frame-filling with minimal background, for accurate Centering measurement.</p>
     <ul class="tips-list">
-      <li>ใช้แสงสว่างที่มากพอ เห็นรายละเอียดการ์ดชัดเจน</li>
-      <li>ถอดออกจาก Penny Sleeve หรือซองใดๆ ก่อนถ่าย ให้เป็น Raw Card</li>
-      <li>หลีกเลี่ยงแสงสะท้อน/แสงจ้าบนหน้าการ์ด เพราะจะทำให้ผลวิเคราะห์คลาดเคลื่อน</li>
+      <li data-i18n="tip1">Use enough lighting to clearly show card details</li>
+      <li data-i18n="tip2">Remove any penny sleeve or protector — use a raw card</li>
+      <li data-i18n="tip3">Avoid glare/reflections on the card surface, as they can skew the analysis</li>
     </ul>
     <div class="example-photos">
       <div class="example-photo">
-        <img src="img/example-front.jpg" alt="ตัวอย่างรูปหน้าการ์ด">
-        <span>ตัวอย่างรูปหน้า — เต็มเฟรม พื้นหลังน้อย</span>
+        <img src="img/example-front.jpg" alt="Front example">
+        <span data-i18n="example_front_caption">Front example</span>
       </div>
       <div class="example-photo">
-        <img src="img/example-back.jpg" alt="ตัวอย่างรูปหลังการ์ด">
-        <span>ตัวอย่างรูปหลัง — เต็มเฟรม พื้นหลังน้อย</span>
+        <img src="img/example-back.jpg" alt="Back example">
+        <span data-i18n="example_back_caption">Back example</span>
       </div>
     </div>
     <div class="upload-row">
       <label class="upload-drop" id="front-drop">
         <input type="file" accept="image/*" capture="environment" id="front-input" hidden>
         <img class="upload-drop__preview" id="front-preview" hidden>
-        <span class="upload-drop__label">Front photo</span>
+        <span class="upload-drop__icon">📷</span>
+        <span class="upload-drop__label" data-i18n="front_photo">Front photo</span>
       </label>
       <label class="upload-drop" id="back-drop">
         <input type="file" accept="image/*" capture="environment" id="back-input" hidden>
         <img class="upload-drop__preview" id="back-preview" hidden>
-        <span class="upload-drop__label">Back photo</span>
+        <span class="upload-drop__icon">📷</span>
+        <span class="upload-drop__label" data-i18n="back_photo">Back photo</span>
       </label>
     </div>
   </section>
 
   <section class="panel" id="panel-align" hidden>
-    <h2 class="panel__title">3. Align card corners</h2>
-    <p class="panel__hint">ลากจุดทั้ง 4 ให้ตรงกับมุมจริงของการ์ดในรูป (ใช้กับรูปที่ถ่ายเอียง/ไม่ตรงมุมได้) ระบบจะปรับภาพให้ตรงก่อนวัด Centering</p>
+    <h2 class="panel__title"><span class="step-badge">3</span><span data-i18n="step3_title">Align card corners</span></h2>
+    <p class="panel__hint" data-i18n="step3_hint">Drag the 4 points to match the card's actual corners in the photo.</p>
     <div class="centering-row">
       <div class="centering-col">
-        <div class="centering-col__label">Front</div>
+        <div class="centering-col__label" data-i18n="front">Front</div>
         <canvas id="front-align-canvas" class="centering-canvas"></canvas>
-        <button type="button" class="btn-secondary btn-small" id="front-align-reset-btn">Reset corners</button>
+        <button type="button" class="btn-secondary btn-small" id="front-align-reset-btn" data-i18n="reset_corners">Reset corners</button>
       </div>
       <div class="centering-col">
-        <div class="centering-col__label">Back</div>
+        <div class="centering-col__label" data-i18n="back">Back</div>
         <canvas id="back-align-canvas" class="centering-canvas"></canvas>
-        <button type="button" class="btn-secondary btn-small" id="back-align-reset-btn">Reset corners</button>
+        <button type="button" class="btn-secondary btn-small" id="back-align-reset-btn" data-i18n="reset_corners">Reset corners</button>
       </div>
     </div>
-    <button type="button" class="btn-primary" id="confirm-align-btn">Confirm alignment</button>
+    <button type="button" class="btn-primary" id="confirm-align-btn" data-i18n="confirm_alignment">Confirm alignment</button>
   </section>
 
   <section class="panel" id="panel-centering" hidden>
-    <h2 class="panel__title">4. Centering measurement</h2>
-    <p class="panel__hint">เส้นสีเหลืองคือขอบในที่ตรวจจับอัตโนมัติ — ลากปรับได้ถ้าไม่ตรง</p>
+    <h2 class="panel__title"><span class="step-badge">4</span><span data-i18n="step4_title">Centering measurement</span></h2>
+    <p class="panel__hint" data-i18n="step4_hint">Yellow lines are the auto-detected inner border.</p>
     <div class="centering-row">
       <div class="centering-col">
-        <div class="centering-col__label">Front</div>
+        <div class="centering-col__label" data-i18n="front">Front</div>
         <canvas id="front-centering-canvas" class="centering-canvas"></canvas>
         <div class="centering-ratios">
           <span>L/R <b id="front-ratio-lr">-</b></span>
           <span>T/B <b id="front-ratio-tb">-</b></span>
         </div>
-        <button type="button" class="btn-secondary btn-small" id="front-reset-btn">Re-detect</button>
+        <button type="button" class="btn-secondary btn-small" id="front-reset-btn" data-i18n="redetect">Re-detect</button>
       </div>
       <div class="centering-col">
-        <div class="centering-col__label">Back</div>
+        <div class="centering-col__label" data-i18n="back">Back</div>
         <canvas id="back-centering-canvas" class="centering-canvas"></canvas>
         <div class="centering-ratios">
           <span>L/R <b id="back-ratio-lr">-</b></span>
           <span>T/B <b id="back-ratio-tb">-</b></span>
         </div>
-        <button type="button" class="btn-secondary btn-small" id="back-reset-btn">Re-detect</button>
+        <button type="button" class="btn-secondary btn-small" id="back-reset-btn" data-i18n="redetect">Re-detect</button>
       </div>
     </div>
   </section>
 
   <section class="panel" id="panel-xray" hidden>
-    <h2 class="panel__title">5. Light / X-ray inspection tool</h2>
-    <p class="panel__hint">ปรับแสงเพื่อตรวจสอบ Surface ด้วยตาตัวเอง — ลากตรงกลางภาพเพื่อเทียบมุมมองปกติ vs. enhanced</p>
+    <h2 class="panel__title"><span class="step-badge">5</span><span data-i18n="step5_title">Light / X-ray inspection tool</span></h2>
+    <p class="panel__hint" data-i18n="step5_hint">Adjust lighting to inspect Surface yourself.</p>
     <div class="xray-select">
-      <button type="button" class="xray-btn is-active" data-side="front">Front</button>
-      <button type="button" class="xray-btn" data-side="back">Back</button>
+      <button type="button" class="xray-btn is-active" data-side="front" data-i18n="front">Front</button>
+      <button type="button" class="xray-btn" data-side="back" data-i18n="back">Back</button>
     </div>
     <div id="compare-container" class="compare-slider"></div>
     <div class="sliders">
-      <label>Brightness <input type="range" id="brightness-slider" min="-40" max="40" value="0"></label>
-      <label>Contrast <input type="range" id="contrast-slider" min="-40" max="40" value="0"></label>
-      <label>Exposure <input type="range" id="exposure-slider" min="-40" max="40" value="0"></label>
+      <label><span data-i18n="brightness">Brightness</span> <input type="range" id="brightness-slider" min="-40" max="40" value="0"></label>
+      <label><span data-i18n="contrast">Contrast</span> <input type="range" id="contrast-slider" min="-40" max="40" value="0"></label>
+      <label><span data-i18n="exposure">Exposure</span> <input type="range" id="exposure-slider" min="-40" max="40" value="0"></label>
     </div>
   </section>
 
   <section class="panel" id="panel-analyze" hidden>
-    <h2 class="panel__title">6. AI analysis</h2>
+    <h2 class="panel__title"><span class="step-badge">6</span><span data-i18n="step6_title">AI analysis</span></h2>
     <div class="notice-box">
-      <strong>⚠️ Please read before analyzing</strong>
-      <p>This tool provides a preliminary estimate only, meant as a guideline before submitting your card to an official grading company. The AI is trained on scoring logic modeled after the standards published by PSA, CGC, BGS, and TAG, but its results are not guaranteed to match your actual submission grade. Please use this tool at your own discretion — we accept no liability for any loss or damage arising from decisions made based on it.</p>
+      <strong data-i18n="notice_title">⚠️ Please read before analyzing</strong>
+      <p data-i18n="notice_body">This tool provides a preliminary estimate only.</p>
     </div>
-    <button type="button" class="btn-primary" id="analyze-btn">Analyze with AI</button>
-    <p class="loading" id="analyze-loading" hidden>Analyzing… this can take up to ~20s</p>
+    <button type="button" class="btn-primary" id="analyze-btn" data-i18n="analyze_btn">Analyze with AI</button>
+    <p class="loading" id="analyze-loading" hidden data-i18n="analyzing">Analyzing…</p>
     <p class="error" id="analyze-error" hidden></p>
 
     <div id="results-container"></div>
 
     <div id="save-section" hidden>
-      <button type="button" class="btn-primary" id="save-image-btn">💾 Save as Image</button>
+      <button type="button" class="btn-primary" id="save-image-btn" data-i18n="save_image_btn">💾 Save as Image</button>
       <p class="save-status" id="save-status"></p>
     </div>
   </section>
 
   <section class="panel donate-panel">
-    <h2 class="panel__title">☕ สนับสนุนผู้พัฒนา</h2>
-    <p class="panel__hint">ถ้าเครื่องมือนี้มีประโยชน์กับคุณ และอยากร่วมสนับสนุนค่าใช้จ่ายในการพัฒนาและดูแลต่อ สามารถส่งกำลังใจผ่านช่องทางด้านล่างได้เลยครับ ขอบคุณที่แวะมาใช้งานนะครับ 🙏</p>
+    <h2 class="panel__title" data-i18n="donate_title">☕ Support the developer</h2>
+    <p class="panel__hint" data-i18n="donate_hint">Support text.</p>
     <div class="donate-content">
       <div class="donate-info">
-        <div class="donate-row"><span class="donate-label">ธนาคาร</span><span>กสิกรไทย (KBank)</span></div>
-        <div class="donate-row"><span class="donate-label">ชื่อบัญชี</span><span>พีรพัฒน์ นฤนาทวานิช (Peerapat Naruenartwanich)</span></div>
+        <div class="donate-row"><span class="donate-label" data-i18n="bank">Bank</span><span>กสิกรไทย (KBank)</span></div>
+        <div class="donate-row"><span class="donate-label" data-i18n="account_name">Account name</span><span>พีรพัฒน์ นฤนาทวานิช (Peerapat Naruenartwanich)</span></div>
         <div class="donate-row">
-          <span class="donate-label">เลขที่บัญชี</span>
+          <span class="donate-label" data-i18n="account_number">Account number</span>
           <span id="donate-account-number" data-raw="6292221418">629-2-22141-8</span>
-          <button type="button" class="btn-secondary btn-small" id="copy-account-btn">Copy</button>
+          <button type="button" class="btn-secondary btn-small" id="copy-account-btn" data-i18n="copy">Copy</button>
         </div>
       </div>
       <img src="img/donate-qr.jpg" alt="PromptPay QR code" class="donate-qr">
