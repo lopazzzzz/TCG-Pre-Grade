@@ -45,8 +45,12 @@ function setupUpload(side, dropId, inputId, previewId, errorId) {
     if (e.dataTransfer.files[0]) handleFile(side, e.dataTransfer.files[0], preview, errorEl);
   });
   input.addEventListener('change', () => {
-    if (input.files[0]) handleFile(side, input.files[0], preview, errorEl);
-    input.value = ''; // allow re-selecting the same file after a failed attempt
+    const file = input.files[0];
+    if (!file) return;
+    // Reset only after the read settles (not synchronously) — clearing the
+    // input's value while a read is still in flight on some mobile browsers
+    // risked interfering with that in-flight read.
+    handleFile(side, file, preview, errorEl).finally(() => { input.value = ''; });
   });
 }
 

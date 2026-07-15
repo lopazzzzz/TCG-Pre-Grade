@@ -1,24 +1,36 @@
 import { WORK_MAX_DIMENSION, CORNER_CROP_FRACTION } from './config.js';
 
+function loadImageElement(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      if (img.naturalWidth > 0 && img.naturalHeight > 0) resolve(img);
+      else reject(new Error('unreadable image file (zero dimensions)'));
+    };
+    img.onerror = () => reject(new Error('unreadable image file'));
+    img.src = URL.createObjectURL(file);
+  });
+}
+
 // Tries createImageBitmap first — it goes through the browser's native image
 // decoder more directly than an <img> + object URL, which some mobile
-// browsers (notably iOS Safari with HEIC photos from the library) handle
-// more reliably. Falls back to the classic <img> approach for browsers/
-// formats where that isn't available or fails silently.
+// browsers handle more reliably for certain formats. Falls back to the
+// classic <img> approach for browsers/formats where that isn't available.
+// Some browsers don't reject createImageBitmap for a format they can't
+// actually decode — they resolve with a degenerate (0x0) bitmap instead —
+// so a zero-dimension result is treated the same as a thrown error and
+// falls through to the <img> path rather than silently "succeeding" with
+// nothing to show.
 export async function loadImageFromFile(file) {
   if (typeof createImageBitmap === 'function') {
     try {
-      return await createImageBitmap(file);
+      const bitmap = await createImageBitmap(file);
+      if (bitmap.width > 0 && bitmap.height > 0) return bitmap;
     } catch {
       // fall through
     }
   }
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error('unreadable image file'));
-    img.src = URL.createObjectURL(file);
-  });
+  return loadImageElement(file);
 }
 
 // Draws the image onto a canvas at a capped working resolution, preserving
