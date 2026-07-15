@@ -130,3 +130,45 @@ export function createCompareSlider(container, normalCanvas, enhancedCanvas) {
 
   return { setPosition, updateImages };
 }
+
+const ZONE_CENTERS = {
+  'top-left': [0.167, 0.167], 'top-center': [0.5, 0.167], 'top-right': [0.833, 0.167],
+  'middle-left': [0.167, 0.5], 'center': [0.5, 0.5], 'middle-right': [0.833, 0.5],
+  'bottom-left': [0.167, 0.833], 'bottom-center': [0.5, 0.833], 'bottom-right': [0.833, 0.833],
+};
+
+// Crops a zoomed-in region of `source` (a canvas or a loaded <img>) around
+// the named 3x3-grid zone and draws a dashed circle roughly marking the
+// flagged spot. This is a zone-level approximation, not a pixel-precise
+// defect locator — Claude names the nearest ninth of the card, not exact
+// coordinates, so the circle is captioned as approximate.
+export function cropZoneThumbnail(source, zone) {
+  const sw = source.naturalWidth || source.width;
+  const sh = source.naturalHeight || source.height;
+  const [cx, cy] = ZONE_CENTERS[zone] || ZONE_CENTERS.center;
+
+  const cropFrac = 0.45;
+  const cropW = sw * cropFrac;
+  const cropH = sh * cropFrac;
+  const sx = Math.min(Math.max(cx * sw - cropW / 2, 0), sw - cropW);
+  const sy = Math.min(Math.max(cy * sh - cropH / 2, 0), sh - cropH);
+
+  const upscale = 2;
+  const out = document.createElement('canvas');
+  out.width = Math.round(cropW * upscale);
+  out.height = Math.round(cropH * upscale);
+  const ctx = out.getContext('2d');
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(source, sx, sy, cropW, cropH, 0, 0, out.width, out.height);
+
+  ctx.save();
+  ctx.strokeStyle = '#e0453f';
+  ctx.lineWidth = 3;
+  ctx.setLineDash([7, 5]);
+  ctx.beginPath();
+  ctx.ellipse(out.width / 2, out.height / 2, out.width * 0.32, out.height * 0.32, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+
+  return canvasToDataUrl(out, 0.9);
+}

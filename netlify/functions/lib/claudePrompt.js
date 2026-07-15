@@ -31,6 +31,8 @@ Score each 1-10 in 0.5 increments, using this scale as a guide (matching PSA/BGS
 
 For every flaw you notice, add an entry to "defects" with:
 - category: "corners" | "surface" | "edges"
+- side: "front" | "back"
+- zone: which ninth of the card the flaw is in, imagining the card divided into a 3x3 grid — one of: "top-left", "top-center", "top-right", "middle-left", "center", "middle-right", "bottom-left", "bottom-center", "bottom-right"
 - location: a short human-readable location, e.g. "front top-left corner", "back surface, center-right", "front bottom edge"
 - description: what the flaw is
 - severity: "minor" | "moderate" | "major"
@@ -40,7 +42,7 @@ Respond with ONLY a JSON object, no markdown fences, no commentary, matching exa
   "corners_score": number,
   "surface_score": number,
   "edges_score": number,
-  "defects": [ { "category": string, "location": string, "description": string, "severity": string } ],
+  "defects": [ { "category": string, "side": string, "zone": string, "location": string, "description": string, "severity": string } ],
   "summary": string
 }`;
 
@@ -54,6 +56,23 @@ function buildUserText({ game, cardName, setName, cardNumber, centeringFrontRati
     `Measured centering (back, ground truth, do not re-estimate): ${centeringBackRatio}`,
     'Images below in order: front full, back full, front top-left corner, front top-right corner, front bottom-left corner, front bottom-right corner, back top-left corner, back top-right corner, back bottom-left corner, back bottom-right corner.',
   ].filter(Boolean).join('\n');
+}
+
+const VALID_ZONES = new Set([
+  'top-left', 'top-center', 'top-right',
+  'middle-left', 'center', 'middle-right',
+  'bottom-left', 'bottom-center', 'bottom-right',
+]);
+
+function normalizeDefect(d) {
+  return {
+    category: typeof d.category === 'string' ? d.category : 'surface',
+    side: d.side === 'back' ? 'back' : 'front',
+    zone: VALID_ZONES.has(d.zone) ? d.zone : 'center',
+    location: typeof d.location === 'string' ? d.location : '',
+    description: typeof d.description === 'string' ? d.description : '',
+    severity: ['minor', 'moderate', 'major'].includes(d.severity) ? d.severity : 'minor',
+  };
 }
 
 function parseGradingResponse(text) {
@@ -70,7 +89,7 @@ function parseGradingResponse(text) {
     corners_score: num(parsed.corners_score),
     surface_score: num(parsed.surface_score),
     edges_score: num(parsed.edges_score),
-    defects: Array.isArray(parsed.defects) ? parsed.defects : [],
+    defects: Array.isArray(parsed.defects) ? parsed.defects.map(normalizeDefect) : [],
     summary: typeof parsed.summary === 'string' ? parsed.summary : '',
   };
 }

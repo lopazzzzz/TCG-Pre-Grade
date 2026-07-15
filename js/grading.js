@@ -1,4 +1,5 @@
 import { API_BASE, COMPANY_LABELS } from './config.js';
+import { cropZoneThumbnail } from './imageTools.js';
 
 export async function parseJsonResponse(res) {
   const raw = await res.text();
@@ -60,21 +61,34 @@ function companyRow(key, data) {
   return el;
 }
 
-function defectItem(defect) {
+function defectItem(defect, imageSources) {
   const el = document.createElement('li');
   el.className = `defect-item defect-item--${defect.severity || 'minor'}`;
+
+  const source = imageSources && imageSources[defect.side || 'front'];
+  const thumbHtml = source
+    ? `<img class="defect-item__thumb" src="${cropZoneThumbnail(source, defect.zone)}" alt="${defect.zone} area, circled approximately">`
+    : '';
+
   el.innerHTML = `
-    <span class="defect-item__category">${defect.category}</span>
-    <span class="defect-item__location">${defect.location}</span>
-    <span class="defect-item__desc">${defect.description}</span>
+    ${thumbHtml}
+    <div class="defect-item__text">
+      <span class="defect-item__category">${defect.category}</span>
+      <span class="defect-item__location">${defect.location}</span>
+      <span class="defect-item__desc">${defect.description}</span>
+      ${source ? '<span class="defect-item__approx">circle = approximate area only</span>' : ''}
+    </div>
   `;
   return el;
 }
 
 // Renders the full results dashboard (sub-scores, company table, defects,
-// disclaimer) into `container`. Used both for a fresh analysis and for
+// disclaimer) into `container`. `imageSources` (optional) is
+// `{ front, back }`, each a canvas or loaded <img> for the corresponding
+// full card photo — when provided, each defect gets a cropped, circled
+// thumbnail of its approximate zone. Used both for a fresh analysis and for
 // read-only history detail views.
-export function renderResultsDashboard(container, result) {
+export function renderResultsDashboard(container, result, imageSources) {
   container.innerHTML = '';
   container.className = 'results-dashboard';
 
@@ -112,7 +126,7 @@ export function renderResultsDashboard(container, result) {
     defectsBlock.appendChild(title);
     const list = document.createElement('ul');
     list.className = 'defects-list';
-    result.defects.forEach((d) => list.appendChild(defectItem(d)));
+    result.defects.forEach((d) => list.appendChild(defectItem(d, imageSources)));
     defectsBlock.appendChild(list);
     container.appendChild(defectsBlock);
   }

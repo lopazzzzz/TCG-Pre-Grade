@@ -1,5 +1,10 @@
 import { API_BASE, GAME_LABELS } from './config.js';
 import { renderResultsDashboard, parseJsonResponse } from './grading.js';
+import { initThemeToggle } from './theme.js';
+import { initDonateCopyButton } from './donate.js';
+
+initThemeToggle();
+initDonateCopyButton();
 
 const grid = document.getElementById('history-grid');
 const emptyState = document.getElementById('history-empty');
@@ -9,6 +14,16 @@ const modalBody = document.getElementById('detail-modal-body');
 const modalClose = document.getElementById('detail-modal-close');
 
 let currentFilter = 'all';
+
+function loadImage(url) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null); // degrade gracefully — defect thumbnails just won't render
+    img.src = url;
+  });
+}
 
 async function fetchCards(game) {
   const url = new URL(`${API_BASE}/list-cards`, window.location.origin);
@@ -59,6 +74,11 @@ async function openDetail(id) {
       <p class="detail-header__meta">${GAME_LABELS[data.game] || data.game}${data.set_name ? ' · ' + data.set_name : ''}${data.card_number ? ' · #' + data.card_number : ''}</p>
     `;
 
+    const [frontImg, backImg] = await Promise.all([
+      data.front_image_signed_url ? loadImage(data.front_image_signed_url) : null,
+      data.back_image_signed_url ? loadImage(data.back_image_signed_url) : null,
+    ]);
+
     const dashboard = document.createElement('div');
     renderResultsDashboard(dashboard, {
       centering: { score: data.centering_score, front_ratio: data.centering_front_ratio, back_ratio: data.centering_back_ratio },
@@ -73,7 +93,7 @@ async function openDetail(id) {
         bgs: { estimate: data.bgs_estimate, confidence: data.bgs_confidence },
         tag: { estimate: data.tag_estimate, confidence: data.tag_confidence },
       },
-    });
+    }, { front: frontImg, back: backImg });
 
     modalBody.innerHTML = '';
     modalBody.appendChild(header);

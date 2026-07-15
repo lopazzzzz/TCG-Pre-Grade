@@ -1,6 +1,11 @@
 import { loadImageFromFile, toWorkingCanvas, canvasToDataUrl, generateCornerCrops, applyAdjustments, createCompareSlider } from './imageTools.js';
 import { autoDetectBorders, computeRatios, attachBorderEditor } from './centering.js';
 import { analyzeCard, saveCard, renderResultsDashboard } from './grading.js';
+import { initThemeToggle } from './theme.js';
+import { initDonateCopyButton } from './donate.js';
+
+initThemeToggle();
+initDonateCopyButton();
 
 const state = {
   game: 'pokemon',
@@ -165,7 +170,10 @@ document.getElementById('analyze-btn').addEventListener('click', async () => {
     const result = await analyzeCard(payload);
     state.lastResult = result;
 
-    renderResultsDashboard(document.getElementById('results-container'), result);
+    renderResultsDashboard(document.getElementById('results-container'), result, {
+      front: state.front.canvas,
+      back: state.back.canvas,
+    });
     document.getElementById('save-section').hidden = false;
     document.getElementById('save-status').textContent = '';
   } catch (err) {

@@ -3,15 +3,34 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>TCG Pre-Grade — History</title>
+<title>Cardify — History</title>
+<link rel="icon" href="img/favicon.png">
+<link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="Cardify">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<script>
+(function () {
+  try {
+    var saved = localStorage.getItem('tcg-theme');
+    var theme = saved || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    document.documentElement.setAttribute('data-theme', theme);
+  } catch (e) {}
+})();
+</script>
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 <header class="app-header">
-  <h1 class="app-header__title">TCG Pre-Grade</h1>
+  <h1 class="app-header__title">
+    <img src="img/logo-black.png" alt="Cardify" class="app-header__logo app-header__logo--light">
+    <img src="img/logo-white.png" alt="Cardify" class="app-header__logo app-header__logo--dark">
+  </h1>
   <nav class="app-header__nav">
     <a href="index.html" class="app-header__link">New Pre-Grade</a>
     <a href="history.html" class="app-header__link is-active">History</a>
+    <button type="button" id="theme-toggle" class="theme-toggle" aria-label="Toggle dark mode">🌙</button>
   </nav>
 </header>
 
@@ -24,6 +43,23 @@
     </div>
     <div id="history-grid" class="history-grid"></div>
     <p id="history-empty" class="empty-state" style="display:none">ยังไม่มีการ์ดที่เคย Pre-Grade</p>
+  </section>
+
+  <section class="panel donate-panel">
+    <h2 class="panel__title">☕ สนับสนุนผู้พัฒนา</h2>
+    <p class="panel__hint">ถ้าเครื่องมือนี้มีประโยชน์กับคุณ และอยากร่วมสนับสนุนค่าใช้จ่ายในการพัฒนาและดูแลต่อ สามารถส่งกำลังใจผ่านช่องทางด้านล่างได้เลยครับ ขอบคุณที่แวะมาใช้งานนะครับ 🙏</p>
+    <div class="donate-content">
+      <div class="donate-info">
+        <div class="donate-row"><span class="donate-label">ธนาคาร</span><span>กสิกรไทย (KBank)</span></div>
+        <div class="donate-row"><span class="donate-label">ชื่อบัญชี</span><span>พีรพัฒน์ นฤนาทวานิช (Peerapat Naruenartwanich)</span></div>
+        <div class="donate-row">
+          <span class="donate-label">เลขที่บัญชี</span>
+          <span id="donate-account-number" data-raw="6292221418">629-2-22141-8</span>
+          <button type="button" class="btn-secondary btn-small" id="copy-account-btn">Copy</button>
+        </div>
+      </div>
+      <img src="img/donate-qr.jpg" alt="PromptPay QR code" class="donate-qr">
+    </div>
   </section>
 </main>
 
