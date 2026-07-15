@@ -46,8 +46,7 @@ export const translations = {
     save_image_btn: '💾 บันทึกเป็นรูปภาพ',
     saving_image: 'กำลังสร้างภาพ…',
     saved_image: 'สร้างภาพแล้ว ✓',
-    save_image_hint: 'กดค้างที่รูปด้านบนแล้วเลือก "บันทึกลงรูปภาพ" เพื่อบันทึกลงคลังภาพในเครื่อง',
-    download_btn: 'ดาวน์โหลด',
+    save_image_hint: 'กดค้างที่รูปด้านบน (หรือคลิกขวาบนคอม) แล้วเลือก "บันทึกลงรูปภาพ" เพื่อบันทึกลงคลังภาพในเครื่อง',
 
     centering: 'Centering',
     corners: 'Corners',
@@ -116,8 +115,7 @@ export const translations = {
     save_image_btn: '💾 Save as Image',
     saving_image: 'Generating image…',
     saved_image: 'Image ready ✓',
-    save_image_hint: 'Press and hold the image above and choose "Save to Photos" to save it to your device.',
-    download_btn: 'Download',
+    save_image_hint: 'Press and hold (or right-click) the image above and choose "Save Image" to save it to your device.',
 
     centering: 'Centering',
     corners: 'Corners',

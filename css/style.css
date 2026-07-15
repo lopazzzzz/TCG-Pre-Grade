@@ -485,4 +485,4 @@ input[type="range"]::-moz-range-thumb {
   color: var(--text-muted);
 }
 .report-modal__img { width: 100%; border-radius: var(--radius-sm); margin-bottom: 12px; -webkit-touch-callout: default; }
-.report-modal__hint { font-size: 0.85rem; color: var(--text-muted); margin: 0 0 14px; }
+.report-modal__hint { font-size: 0.85rem; color: var(--text-muted); margin: 0; }

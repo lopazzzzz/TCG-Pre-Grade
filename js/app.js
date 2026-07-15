@@ -245,19 +245,14 @@ document.getElementById('analyze-btn').addEventListener('click', async () => {
 });
 
 // ---- Save as Image ----
-// Shows the generated report as a full-size, long-press-able <img> in a
-// modal instead of relying on an <a download> click — iOS Safari/WebKit
-// has never reliably honored the `download` attribute for saving to the
-// Photos library (it typically just opens the image), whereas long-
-// pressing a real on-page <img> and choosing "Save to Photos" always works.
-// The Download button/link inside the modal is kept as a convenience for
-// desktop and Android, where the classic download flow works fine.
-function openReportModal(canvas, filename) {
-  const dataUrl = canvas.toDataURL('image/png');
-  document.getElementById('report-modal-img').src = dataUrl;
-  const downloadLink = document.getElementById('report-modal-download');
-  downloadLink.href = dataUrl;
-  downloadLink.download = filename;
+// Shows the generated report as a full-size <img> in a modal rather than
+// relying on an <a download> click — iOS Safari/WebKit has never reliably
+// honored the `download` attribute for saving to Photos (it typically just
+// opens the image, or does nothing at all), whereas the plain <img>'s
+// native "Save Image"/"Save to Photos" context menu (long-press on mobile,
+// right-click on desktop) works universally without needing that attribute.
+function openReportModal(canvas) {
+  document.getElementById('report-modal-img').src = canvas.toDataURL('image/png');
   document.getElementById('report-modal').classList.add('is-open');
 }
 
@@ -300,8 +295,7 @@ document.getElementById('save-image-btn').addEventListener('click', async () => 
       timestamp,
     });
 
-    const fileStamp = now.toISOString().replace(/[:.]/g, '-');
-    openReportModal(reportCanvas, `cardify-pregrade-${fileStamp}.png`);
+    openReportModal(reportCanvas);
     statusEl.textContent = t('saved_image');
   } catch (err) {
     statusEl.textContent = `Error: ${err.message}`;
