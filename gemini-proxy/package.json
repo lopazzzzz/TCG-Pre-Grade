@@ -5,6 +5,9 @@
   "description": "Thin Gemini API relay running on a fixed Google Cloud region, so the outbound call to Gemini never appears to originate from a Cloudflare edge PoP that Google's geo-IP check might misattribute to an unsupported country.",
   "type": "module",
   "main": "index.js",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "start": "node index.js"
   },
