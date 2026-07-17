@@ -1,9 +1,6 @@
 import { SYSTEM_PROMPT, buildUserText, parseGradingResponse, computeCompanyEstimates } from '../../lib/gradingPrompt.js';
 import { logScan } from '../../lib/scanLog.js';
 
-const GEMINI_MODEL = 'gemini-3.1-flash-lite';
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
-
 const IMAGE_LABELS = [
   'front full', 'back full',
   'front top-left corner', 'front top-right corner', 'front bottom-left corner', 'front bottom-right corner',
@@ -39,9 +36,10 @@ export async function onRequestPost({ request, env }) {
       return Response.json({ error: 'Expected 10 images: front, back, 4 front corners, 4 back corners' }, { status: 400 });
     }
 
-    const apiKey = env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return Response.json({ error: 'Server missing GEMINI_API_KEY' }, { status: 500 });
+    const proxyUrl = env.GEMINI_PROXY_URL;
+    const proxySecret = env.PROXY_SECRET;
+    if (!proxyUrl || !proxySecret) {
+      return Response.json({ error: 'Server missing GEMINI_PROXY_URL/PROXY_SECRET' }, { status: 500 });
     }
 
     const parts = [
@@ -58,13 +56,19 @@ export async function onRequestPost({ request, env }) {
       generationConfig: { temperature: 0.2, maxOutputTokens: 1500 },
     };
 
-    // Use the x-goog-api-key header (not ?key= query param) — this is the
-    // method Google's current docs show, and the one confirmed to work with
-    // both legacy "AIza" Standard keys and the newer "AQ.Ab" Auth keys that
-    // Google AI Studio now issues by default.
-    const res = await fetch(GEMINI_URL, {
+    // Relayed through a small Cloud Run service (see gemini-proxy/) rather
+    // than calling Gemini directly from here — Cloudflare executes this
+    // function at whichever edge location is nearest the visitor, and
+    // Google's API occasionally rejects the outbound call with "User
+    // location is not supported" when that edge IP gets geo-attributed to
+    // an unsupported country. Cloud Run runs from one fixed region and
+    // calls Gemini over Google's own network, sidestepping that entirely.
+    // The proxy forwards Gemini's response (including its exact status
+    // code and error shape) unchanged, so the handling below is identical
+    // to calling Gemini directly.
+    const res = await fetch(proxyUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+      headers: { 'Content-Type': 'application/json', 'x-proxy-secret': proxySecret },
       body: JSON.stringify(requestBody),
     });
 

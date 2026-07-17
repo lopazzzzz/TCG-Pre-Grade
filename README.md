@@ -13,15 +13,36 @@ results.
 
 1. Go to [aistudio.google.com/apikey](https://aistudio.google.com/apikey) →
    sign in with a Google account → **Create API key**.
-2. Note it down as `GEMINI_API_KEY`. The app calls `gemini-3.1-flash-lite`,
+2. Note it down. The app calls `gemini-3.1-flash-lite`,
    which has a generous free tier (~1,000 requests/day at time of writing —
    check [ai.google.dev/gemini-api/docs/rate-limits](https://ai.google.dev/gemini-api/docs/rate-limits)
    for the current number) — for personal use this is effectively free.
    Google model names change fairly often; if analysis starts failing with a
    "model no longer available" error, check
    [ai.google.dev/gemini-api/docs/models](https://ai.google.dev/gemini-api/docs/models)
-   for the current flash-lite model ID and update it in
-   `functions/api/analyze-card.js`.
+   for the current flash-lite model ID and update it in `gemini-proxy/index.js`.
+3. This key gets used by the **Gemini proxy** (step 1.5 below), not directly
+   by the Cloudflare site — keep reading.
+
+## 1.5. Deploy the Gemini proxy (Google Cloud Run)
+
+The Gemini call is relayed through a small service on Google Cloud Run
+instead of being called directly from Cloudflare. This isn't optional
+plumbing: Cloudflare executes each request at whichever of its 300+ global
+edge locations is nearest the visitor, and Google's API occasionally rejects
+the call with **"User location is not supported for the API use"** when that
+particular edge IP gets geo-attributed to an unsupported country — it's
+intermittent and varies by which network/location a visitor happens to be
+on. Cloud Run runs from one fixed region and calls Gemini over Google's own
+network, which avoids that problem entirely.
+
+Full setup steps are in [`gemini-proxy/README.md`](gemini-proxy/README.md).
+Summary: create a Google Cloud project (needs a billing account attached,
+same as Cloudflare R2 did, but this stays free at personal-use volume),
+deploy `gemini-proxy/` to Cloud Run connected to the same GitHub repo, and
+set `GEMINI_API_KEY` + a `PROXY_SECRET` (any long random string) as its
+environment variables. You'll need the resulting service URL and that same
+`PROXY_SECRET` for step 3 below.
 
 ## 2. Set up the admin dashboard
 
@@ -54,9 +75,10 @@ Pick two values, to be set as environment variables in step 3:
    add an **R2 bucket** binding: variable name `SCAN_BUCKET`, bucket
    `cardify-scans` (this mirrors `wrangler.toml` for the deployed
    environment; the dashboard binding is what production actually uses).
-6. Go to **Settings → Environment variables** and add `GEMINI_API_KEY`,
-   `ADMIN_PASSWORD`, and `ADMIN_SESSION_SECRET` (mark them as **Secret**, not
-   plaintext).
+6. Go to **Settings → Environment variables** and add `GEMINI_PROXY_URL`
+   (the Cloud Run service URL from step 1.5, including a trailing `/`),
+   `PROXY_SECRET` (matching the one set on Cloud Run), `ADMIN_PASSWORD`, and
+   `ADMIN_SESSION_SECRET` (mark them all as **Secret**, not plaintext).
 7. Redeploy (**Deployments → Retry deployment**, or just push a commit) so the
    new bindings/env vars take effect. Cloudflare gives you a URL like
    `https://<something>.pages.dev` — open it on both desktop Chrome and mobile
@@ -70,10 +92,15 @@ Pick two values, to be set as environment variables in step 3:
 npm install -g wrangler   # once
 cd tcg-pregrade
 wrangler pages dev . --r2 SCAN_BUCKET \
-  -b GEMINI_API_KEY=AIza... \
+  -b GEMINI_PROXY_URL=https://your-proxy.a.run.app/ \
+  -b PROXY_SECRET=dev-secret \
   -b ADMIN_PASSWORD=your-password \
   -b ADMIN_SESSION_SECRET=$(openssl rand -hex 32)
 ```
+
+The Gemini proxy itself can also run locally (see
+[`gemini-proxy/README.md`](gemini-proxy/README.md)) if you'd rather not hit
+the real deployed Cloud Run service while developing.
 
 `wrangler pages dev` serves the static frontend and runs the Pages Functions
 locally under `/api/*`, with a local-only simulated R2 bucket (no data ever
