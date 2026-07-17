@@ -1,110 +1,40 @@
 // Geometric centering measurement.
 //
 // Real centering is the position of the INNER printed border (the frame
-// around the artwork) relative to the card's own OUTER physical edge — not
-// relative to the photo frame. Many real-world photos leave some background
-// visible around the card, so we detect both edges in two stages:
-//   1. OUTER: the card-vs-background edge, searched near the photo's own
-//      boundary (a strong, usually high-contrast transition).
-//   2. INNER: the border-to-artwork edge, searched only within the outer
-//      card region found in stage 1 (so it can't accidentally lock onto the
-//      outer edge itself, or onto some contrasty spot deep in the artwork).
-// Both lines are drawn and are independently draggable, so a user can
-// correct either one if the auto-detection gets confused (glare, holo
-// pattern, full-art card with no solid border, etc).
+// around the artwork) relative to the card's own OUTER physical edge.
+// The outer line defaults to the canvas boundary itself (0/1) rather than
+// being auto-detected from image content: Step 3's alignment warps the
+// user-chosen corners to fill the output canvas exactly, so by
+// construction the card's physical edge already IS the canvas edge here
+// (barring an imprecise Step 3 drag). There is no reliable way to tell
+// "leftover background margin" apart from "the card's own uniform border
+// design" from image content alone — both read as equally low detail
+// density — so rather than guess wrong, this trusts the alignment step.
+// The outer line stays fully manually draggable as a safety net for the
+// rare case Step 3 left real residual margin.
+//
+// The inner (border-to-artwork) line IS auto-detected, searched as a
+// fraction of the card's own width/height from each edge inward, since
+// that transition (uniform border -> detailed artwork) is a much more
+// reliable signal than "is there background here at all."
 
 import { createLoupe } from './loupe.js';
-
-function luminance(data, i) {
-  return 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-}
-
-// Detects a brightness transition for `side` within the absolute pixel
-// window [loPx, hiPx). Scans from the edge nearest to that window's outer
-// boundary inward (so "first strong transition encountered" means "nearest
-// to the outside"), using a windowed gradient (average of a few samples
-// ahead vs. behind) rather than a single-pixel diff, since holo/foil
-// textures and print noise create single-pixel spikes a naive diff would
-// mistake for a real edge. Returns a fraction of the full dimension (0-1).
-function detectTransition(imageData, width, height, side, loPx, hiPx) {
-  const isHorizontalScan = side === 'left' || side === 'right';
-  const scanLength = isHorizontalScan ? width : height;
-  const stripStart = isHorizontalScan ? Math.floor(height * 0.4) : Math.floor(width * 0.4);
-  const stripEnd = isHorizontalScan ? Math.ceil(height * 0.6) : Math.ceil(width * 0.6);
-
-  const profile = new Float64Array(scanLength);
-  for (let p = 0; p < scanLength; p++) {
-    let sum = 0;
-    let count = 0;
-    for (let s = stripStart; s < stripEnd; s++) {
-      const x = isHorizontalScan ? p : s;
-      const y = isHorizontalScan ? s : p;
-      const idx = (y * width + x) * 4;
-      sum += luminance(imageData.data, idx);
-      count++;
-    }
-    profile[p] = sum / count;
-  }
-
-  const WINDOW = 3;
-  function windowedGradient(pos) {
-    let before = 0, beforeN = 0, after = 0, afterN = 0;
-    for (let k = 1; k <= WINDOW; k++) {
-      if (pos - k >= 0) { before += profile[pos - k]; beforeN++; }
-      if (pos + k < scanLength) { after += profile[pos + k]; afterN++; }
-    }
-    if (!beforeN || !afterN) return 0;
-    return Math.abs(after / afterN - before / beforeN);
-  }
-
-  const from = side === 'right' || side === 'bottom'; // near edge is the "hi" side
-  const lo = Math.max(0, Math.floor(loPx));
-  const hi = Math.min(scanLength, Math.ceil(hiPx));
-  const STRONG_GRADIENT = 22;
-
-  let bestPos = from ? Math.max(lo, hi - 1) : lo;
-  let bestGrad = -1;
-  let firstStrongPos = null;
-
-  if (from) {
-    for (let pos = hi - 1; pos >= lo; pos--) {
-      const grad = windowedGradient(pos);
-      if (grad > bestGrad) { bestGrad = grad; bestPos = pos; }
-      if (firstStrongPos === null && grad >= STRONG_GRADIENT) firstStrongPos = pos;
-    }
-  } else {
-    for (let pos = lo; pos < hi; pos++) {
-      const grad = windowedGradient(pos);
-      if (grad > bestGrad) { bestGrad = grad; bestPos = pos; }
-      if (firstStrongPos === null && grad >= STRONG_GRADIENT) firstStrongPos = pos;
-    }
-  }
-
-  return (firstStrongPos !== null ? firstStrongPos : bestPos) / scanLength;
-}
+import { buildDensityProfile, findContentEdge } from './edgeDetect.js';
 
 export function autoDetectBorders(canvas) {
   const ctx = canvas.getContext('2d');
   const { width, height } = canvas;
   const imageData = ctx.getImageData(0, 0, width, height);
+  const profileX = buildDensityProfile(imageData, width, height, true);
+  const profileY = buildDensityProfile(imageData, width, height, false);
 
-  // Stage 1 — outer card edge vs. background, searched near the photo edge.
-  const outer = {
-    left: detectTransition(imageData, width, height, 'left', width * 0.01, width * 0.45),
-    right: detectTransition(imageData, width, height, 'right', width * 0.55, width * 0.99),
-    top: detectTransition(imageData, width, height, 'top', height * 0.01, height * 0.45),
-    bottom: detectTransition(imageData, width, height, 'bottom', height * 0.55, height * 0.99),
-  };
+  const outer = { left: 0, right: 1, top: 0, bottom: 1 };
 
-  // Stage 2 — inner printed border, searched only within the outer card
-  // region (as a fraction of the CARD's own width/height, not the photo's).
-  const cardWPx = (outer.right - outer.left) * width;
-  const cardHPx = (outer.bottom - outer.top) * height;
   const inner = {
-    left: detectTransition(imageData, width, height, 'left', outer.left * width + cardWPx * 0.01, outer.left * width + cardWPx * 0.32),
-    right: detectTransition(imageData, width, height, 'right', outer.right * width - cardWPx * 0.32, outer.right * width - cardWPx * 0.01),
-    top: detectTransition(imageData, width, height, 'top', outer.top * height + cardHPx * 0.01, outer.top * height + cardHPx * 0.32),
-    bottom: detectTransition(imageData, width, height, 'bottom', outer.bottom * height - cardHPx * 0.32, outer.bottom * height - cardHPx * 0.01),
+    left: findContentEdge(profileX, true, width * 0.01, width * 0.32) / width,
+    right: findContentEdge(profileX, false, width * 0.68, width * 0.99) / width,
+    top: findContentEdge(profileY, true, height * 0.01, height * 0.32) / height,
+    bottom: findContentEdge(profileY, false, height * 0.68, height * 0.99) / height,
   };
 
   return { outer, inner };
@@ -164,6 +94,11 @@ export function attachBorderEditor(canvas, initialBorders, onChange) {
     return rect.width ? canvas.width / rect.width : 1;
   }
 
+  // Thin lines rather than thick ones — bulky lines were hard to read
+  // against the card art underneath. A small solid "grip" dot at each
+  // line's midpoint gives a clear, deliberate grab target instead, while
+  // the actual hit-test tolerance (see nearestLine) stays generous along
+  // the whole line, not just at the dot.
   function drawSet(ctx, b, color, lineWidthCssPx, dash, scale) {
     ctx.save();
     ctx.strokeStyle = color;
@@ -178,6 +113,22 @@ export function attachBorderEditor(canvas, initialBorders, onChange) {
     ctx.beginPath(); ctx.moveTo(0, y1); ctx.lineTo(canvas.width, y1); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(0, y2); ctx.lineTo(canvas.width, y2); ctx.stroke();
     ctx.restore();
+
+    ctx.save();
+    ctx.setLineDash([]);
+    ctx.fillStyle = color;
+    ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+    ctx.lineWidth = 1 * scale;
+    const dotR = 5 * scale;
+    const midY = canvas.height * 0.5;
+    const midX = canvas.width * 0.5;
+    [[x1, midY], [x2, midY], [midX, y1], [midX, y2]].forEach(([dx, dy]) => {
+      ctx.beginPath();
+      ctx.arc(dx, dy, dotR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    });
+    ctx.restore();
   }
 
   function draw() {
@@ -186,8 +137,8 @@ export function attachBorderEditor(canvas, initialBorders, onChange) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
     const scale = cssToInternalScale();
-    drawSet(ctx, borders.outer, OUTER_COLOR, 2.5, [6, 4], scale);
-    drawSet(ctx, borders.inner, INNER_COLOR, 3.5, [3, 3], scale);
+    drawSet(ctx, borders.outer, OUTER_COLOR, 1.25, [6, 4], scale);
+    drawSet(ctx, borders.inner, INNER_COLOR, 1.5, [3, 3], scale);
   }
 
   function nearestLine(px, py) {

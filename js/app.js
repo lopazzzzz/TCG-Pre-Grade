@@ -1,6 +1,6 @@
 import { loadImageFromFile, toWorkingCanvas, canvasToDataUrl, makeThumbnailDataUrl, generateCornerCrops, applyAdjustments, createCompareSlider } from './imageTools.js';
 import { autoDetectBorders, computeRatios, attachBorderEditor } from './centering.js';
-import { defaultCorners, attachCornerPicker, warpQuadToRect } from './perspective.js';
+import { autoDetectCorners, attachCornerPicker, warpQuadToRect } from './perspective.js';
 import { analyzeCard, renderResultsDashboard } from './grading.js';
 import { generateReportImage } from './report.js';
 import { initThemeToggle } from './theme.js';
@@ -94,12 +94,12 @@ function setupAlign(side, canvasId, resetBtnId) {
   displayCanvas.height = original.height;
   displayCanvas._sourceImage = original;
 
-  const initial = defaultCorners(original.width, original.height);
+  const initial = autoDetectCorners(original);
   const editor = attachCornerPicker(displayCanvas, initial, () => {});
   state[side].alignEditor = editor;
 
   document.getElementById(resetBtnId).onclick = () => {
-    editor.setCorners(defaultCorners(original.width, original.height));
+    editor.setCorners(autoDetectCorners(original));
   };
 }
 

@@ -15,6 +15,7 @@
 // visually indistinguishable from a true homography.
 
 import { createLoupe } from './loupe.js';
+import { detectContentBoundingBox } from './edgeDetect.js';
 
 function solve3x3(A, bVec) {
   const M = A.map((row, i) => [...row, bVec[i]]);
@@ -109,6 +110,31 @@ export function defaultCorners(width, height) {
     tr: { x: width - insetX, y: insetY },
     bl: { x: insetX, y: height - insetY },
     br: { x: width - insetX, y: height - insetY },
+  };
+}
+
+// Auto-detects the card's rough axis-aligned bounding box in the raw
+// (un-aligned, possibly skewed) photo so the initial 4 corner points start
+// on the card's actual edges instead of a generic 4%-inset guess. This is
+// still axis-aligned — it doesn't detect rotation/perspective — so a
+// skewed photo still needs the corners dragged into place manually, but a
+// roughly straight-on photo (the common case) needs no manual adjustment
+// at all now. Falls back to the generic inset if detection looks
+// degenerate (e.g. a card that fills the whole frame with no margin, or a
+// background too busy to tell apart from the card).
+export function autoDetectCorners(canvas) {
+  const box = detectContentBoundingBox(canvas);
+  const width = canvas.width;
+  const height = canvas.height;
+  const looksValid = box.right - box.left > 0.1 && box.bottom - box.top > 0.1
+    && box.left < box.right && box.top < box.bottom;
+  if (!looksValid) return defaultCorners(width, height);
+
+  return {
+    tl: { x: box.left * width, y: box.top * height },
+    tr: { x: box.right * width, y: box.top * height },
+    bl: { x: box.left * width, y: box.bottom * height },
+    br: { x: box.right * width, y: box.bottom * height },
   };
 }
 
