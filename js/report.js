@@ -2,7 +2,13 @@ import { COMPANY_LABELS, GAME_LABELS } from './config.js';
 import { generateCornerCrops, cropZoneThumbnail } from './imageTools.js';
 import { t } from './i18n.js';
 
-const WIDTH = 1040;
+// WIDTH is wide enough that stacking front+back side-by-side (rather than
+// one above the other) plus the stat rows and an enlarged flaws section
+// lands close to a 1:1 square overall, instead of the old single-column
+// layout's tall, narrow rectangle. Exact squareness still varies with how
+// many flaws are found (more flaws needs more height) — this targets
+// "roughly square for a typical card," not a hard-cropped fixed size.
+const WIDTH = 1400;
 const PAD = 36;
 const COLORS = {
   bg: '#12182b',
@@ -136,60 +142,62 @@ function scoreColor(score) {
 // Shared geometry for a card-side section, derived from the CARD region's
 // own aspect ratio (not the full canvas, which may include background
 // margin) so the main image fills its column width instead of being
-// letterboxed by extra background.
-function sectionLayout(canvas, cardBounds) {
+// letterboxed by extra background. `sectionW` is passed explicitly (rather
+// than assumed to be the full canvas width) since front/back sections now
+// sit side-by-side, each occupying half the width.
+function sectionLayout(canvas, cardBounds, sectionW) {
   const box = boundsToPx(cardBounds, canvas.width, canvas.height);
-  const sectionW = WIDTH - PAD * 2;
-  const labelH = 40;
-  const gap = 10;
-  const cornerColW = sectionW * 0.22;
+  const labelH = 34;
+  const gap = 8;
+  const cornerColW = sectionW * 0.24;
   const mainColW = sectionW - cornerColW * 2 - gap * 2;
   const mainColH = mainColW * (box.h / box.w);
   const cornerCellH = (mainColH - gap) / 2;
   return { sectionW, labelH, gap, cornerColW, mainColW, mainColH, cornerCellH, totalH: labelH + mainColH, box };
 }
 
-// Draws one card-side section (FRONT or BACK): corner crops flanking the
-// full image with centering guide lines overlaid, matching the layout of
-// well-known pre-grade report generators but reusing our own crop/measure
-// pipeline. Everything is cropped relative to the detected card bounds so a
-// photo with background margin doesn't end up mostly showing background.
-function drawCardSection(ctx, { label, y, canvas, borders, cardBounds }) {
-  const { labelH, gap, cornerColW, mainColW, mainColH, cornerCellH, box } = sectionLayout(canvas, cardBounds);
+// Draws one card-side section (FRONT or BACK) at horizontal offset `x`:
+// corner crops flanking the full image with centering guide lines
+// overlaid, matching the layout of well-known pre-grade report generators
+// but reusing our own crop/measure pipeline. Everything is cropped
+// relative to the detected card bounds so a photo with background margin
+// doesn't end up mostly showing background.
+function drawCardSection(ctx, { label, x, y, sectionW, canvas, borders, cardBounds }) {
+  const { labelH, gap, cornerColW, mainColW, mainColH, cornerCellH, box } = sectionLayout(canvas, cardBounds, sectionW);
 
   ctx.fillStyle = COLORS.border;
-  ctx.font = 'bold 20px -apple-system, sans-serif';
+  ctx.font = 'bold 17px -apple-system, sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText(label, WIDTH / 2, y + labelH - 12);
+  ctx.fillText(label, x + sectionW / 2, y + labelH - 10);
 
   const contentY = y + labelH;
-  const leftX = PAD;
+  const leftX = x;
   const mainX = leftX + cornerColW + gap;
   const rightX = mainX + mainColW + gap;
 
   const crops = generateCornerCrops(canvas, cardBounds);
   const byKey = Object.fromEntries(crops.map((c) => [c.key, c]));
 
-  function drawCropCell(img, x, cy, captionKey) {
-    roundRect(ctx, x, cy, cornerColW, cornerCellH, 6);
+  function drawCropCell(img, cx, cy, captionKey) {
+    roundRect(ctx, cx, cy, cornerColW, cornerCellH, 6);
     ctx.save();
     ctx.clip();
     ctx.fillStyle = '#000';
-    ctx.fillRect(x, cy, cornerColW, cornerCellH);
-    drawImageContain(ctx, img, x, cy, cornerColW, cornerCellH);
+    ctx.fillRect(cx, cy, cornerColW, cornerCellH);
+    drawImageContain(ctx, img, cx, cy, cornerColW, cornerCellH);
     // Caption drawn as an overlay strip INSIDE the cell (not below it) so it
     // can never be clipped/overlapped by the next cell's border.
-    const stripH = 16;
+    const stripH = 15;
     ctx.fillStyle = 'rgba(0,0,0,0.55)';
-    ctx.fillRect(x, cy + cornerCellH - stripH, cornerColW, stripH);
+    ctx.fillRect(cx, cy + cornerCellH - stripH, cornerColW, stripH);
     ctx.fillStyle = '#fff';
-    ctx.font = '9px -apple-system, sans-serif';
+    ctx.font = '8px -apple-system, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(t(captionKey), x + cornerColW / 2, cy + cornerCellH - stripH / 2 + 3);
+    ctx.fillText(t(captionKey), cx + cornerColW / 2, cy + cornerCellH - stripH / 2 + 3);
     ctx.restore();
     ctx.strokeStyle = COLORS.border;
     ctx.lineWidth = 1;
-    roundRect(ctx, x, cy, cornerColW, cornerCellH, 6);
+    roundRect(ctx, cx, cy, cornerColW, cornerCellH, 6);
     ctx.stroke();
   }
 
@@ -210,8 +218,6 @@ function drawCardSection(ctx, { label, y, canvas, borders, cardBounds }) {
   ctx.lineWidth = 1;
   roundRect(ctx, mainX, contentY, mainColW, mainColH, 6);
   ctx.stroke();
-
-  return contentY + mainColH + 24;
 }
 
 function drawStatBox(ctx, x, y, w, h, label, value, valueColor, sub) {
@@ -253,21 +259,24 @@ export async function generateReportImage({
 
   const defectList = defects || [];
   const defCols = 2;
-  const defRowH = 140;
+  const defRowH = 210; // was 140 — flaw thumbnails were too small to read
   const defRows = Math.ceil(defectList.length / defCols);
-  const defectsSectionH = defectList.length ? 50 + defRows * (defRowH + 10) + 10 : 0;
+  const defectsSectionH = defectList.length ? 54 + defRows * (defRowH + 10) + 10 : 0;
 
-  const headerH = 190;
+  const headerH = 160;
   const sectionGap = 24;
-  const frontSectionH = sectionLayout(frontCanvas, frontCardBounds).totalH + sectionGap;
-  const backSectionH = sectionLayout(backCanvas, backCardBounds).totalH + sectionGap;
+  const midGap = 24;
+  const halfSectionW = (WIDTH - PAD * 2 - midGap) / 2;
+  const frontLayout = sectionLayout(frontCanvas, frontCardBounds, halfSectionW);
+  const backLayout = sectionLayout(backCanvas, backCardBounds, halfSectionW);
+  const cardsRowH = Math.max(frontLayout.totalH, backLayout.totalH) + sectionGap;
   const statsH = 140;
   // Generous slack beyond the wrapped disclaimer lines themselves — the
   // "generated by" line plus its own bottom margin previously sat close
   // enough to the outer frame that it could visually touch/overlap it.
   const footerH = disclaimerLines.length * 15 + 90;
 
-  const totalH = headerH + frontSectionH + backSectionH + statsH + defectsSectionH + footerH + PAD;
+  const totalH = headerH + cardsRowH + statsH + defectsSectionH + footerH + PAD;
 
   const canvas = document.createElement('canvas');
   canvas.width = WIDTH;
@@ -284,25 +293,26 @@ export async function generateReportImage({
   ctx.stroke();
 
   // ---- Header ----
-  const logoW = 220;
+  const logoW = 170;
   const logoH = (logo.height / logo.width) * logoW;
-  ctx.drawImage(logo, (WIDTH - logoW) / 2, 30, logoW, logoH);
+  ctx.drawImage(logo, (WIDTH - logoW) / 2, 22, logoW, logoH);
 
   ctx.textAlign = 'center';
   ctx.fillStyle = COLORS.border;
-  ctx.font = 'bold 20px -apple-system, sans-serif';
-  ctx.fillText(t('report_title'), WIDTH / 2, 30 + logoH + 34);
+  ctx.font = 'bold 19px -apple-system, sans-serif';
+  ctx.fillText(t('report_title'), WIDTH / 2, 22 + logoH + 26);
 
   const idBits = [GAME_LABELS[game] || game, cardName, setName, cardNumber].filter(Boolean).join(' · ');
   ctx.fillStyle = COLORS.muted;
   ctx.font = '13px -apple-system, sans-serif';
-  ctx.fillText(idBits, WIDTH / 2, 30 + logoH + 58);
+  ctx.fillText(idBits, WIDTH / 2, 22 + logoH + 47);
 
   let y = headerH;
 
-  // ---- Front / Back sections ----
-  y = drawCardSection(ctx, { label: t('front').toUpperCase(), y, canvas: frontCanvas, borders: frontBorders, cardBounds: frontCardBounds });
-  y = drawCardSection(ctx, { label: t('back').toUpperCase(), y, canvas: backCanvas, borders: backBorders, cardBounds: backCardBounds });
+  // ---- Front / Back sections, side by side ----
+  drawCardSection(ctx, { label: t('front').toUpperCase(), x: PAD, y, sectionW: halfSectionW, canvas: frontCanvas, borders: frontBorders, cardBounds: frontCardBounds });
+  drawCardSection(ctx, { label: t('back').toUpperCase(), x: PAD + halfSectionW + midGap, y, sectionW: halfSectionW, canvas: backCanvas, borders: backBorders, cardBounds: backCardBounds });
+  y += cardsRowH;
 
   // ---- Sub-score row ----
   const subLabels = [
@@ -353,25 +363,25 @@ export async function generateReportImage({
       const sourceBounds = d.side === 'back' ? backCardBounds : frontCardBounds;
       const thumbDataUrl = cropZoneThumbnail(source, d.zone, sourceBounds);
       const thumbImg = await loadImage(thumbDataUrl);
-      const thumbSize = defRowH - 16;
+      const thumbSize = defRowH - 20;
       ctx.save();
-      roundRect(ctx, cx + 8, cy + 8, thumbSize, thumbSize, 6);
+      roundRect(ctx, cx + 10, cy + 10, thumbSize, thumbSize, 8);
       ctx.clip();
-      drawImageContain(ctx, thumbImg, cx + 8, cy + 8, thumbSize, thumbSize);
+      drawImageContain(ctx, thumbImg, cx + 10, cy + 10, thumbSize, thumbSize);
       ctx.restore();
 
-      const textX = cx + 8 + thumbSize + 12;
-      const textMaxW = cellW - thumbSize - 32;
+      const textX = cx + 10 + thumbSize + 18;
+      const textMaxW = cellW - thumbSize - 46;
       ctx.textAlign = 'left';
       ctx.fillStyle = COLORS.border;
-      ctx.font = 'bold 11px -apple-system, sans-serif';
-      ctx.fillText(String(d.category || '').toUpperCase(), textX, cy + 22);
+      ctx.font = 'bold 14px -apple-system, sans-serif';
+      ctx.fillText(String(d.category || '').toUpperCase(), textX, cy + 32);
       ctx.fillStyle = COLORS.text;
-      ctx.font = '13px -apple-system, sans-serif';
-      let ty = wrapText(ctx, d.location || '', textX, cy + 40, textMaxW, 16);
+      ctx.font = '16px -apple-system, sans-serif';
+      let ty = wrapText(ctx, d.location || '', textX, cy + 56, textMaxW, 20);
       ctx.fillStyle = COLORS.muted;
-      ctx.font = '12px -apple-system, sans-serif';
-      wrapText(ctx, d.description || '', textX, ty + 6, textMaxW, 15);
+      ctx.font = '14px -apple-system, sans-serif';
+      wrapText(ctx, d.description || '', textX, ty + 8, textMaxW, 18);
     }
     y += defRows * (defRowH + 10) + 20;
   }
