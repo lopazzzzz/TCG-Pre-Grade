@@ -119,6 +119,46 @@ body {
   .app-main { max-width: 820px; padding-top: 28px; }
 }
 
+.card-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.card-tabs:empty { display: none; }
+.card-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  padding: 6px 8px 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-alt);
+  cursor: pointer;
+  white-space: nowrap;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.card-tab.is-active { border-color: var(--accent); color: var(--text); background: color-mix(in srgb, var(--accent) 14%, var(--surface-alt)); }
+.card-tab__thumb { width: 20px; height: 28px; object-fit: cover; border-radius: 3px; background: #000; flex: none; }
+.card-tab__thumb--empty { background: var(--border); }
+.card-tab__status { font-size: 0.68rem; }
+.card-tab__remove {
+  border: none; background: none; color: var(--text-muted); cursor: pointer;
+  font-size: 0.95rem; line-height: 1; padding: 2px; border-radius: 50%;
+}
+.card-tab__remove:hover { background: color-mix(in srgb, var(--poor) 15%, transparent); color: var(--poor); }
+.card-tab--add {
+  border-style: dashed;
+  background: none;
+  color: var(--accent-dark);
+  font-size: 1rem;
+  padding: 6px 14px;
+}
+.card-tab--add:disabled { opacity: 0.4; cursor: not-allowed; }
+
 .panel {
   background: var(--panel-bg);
   border: 1px solid var(--border);
