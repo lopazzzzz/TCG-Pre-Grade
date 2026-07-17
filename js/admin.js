@@ -5,7 +5,12 @@ import { initThemeToggle } from './theme.js';
 initThemeToggle();
 
 const loginPanel = document.getElementById('login-panel');
+const usagePanel = document.getElementById('usage-panel');
 const dashboardPanel = document.getElementById('dashboard-panel');
+const usageBarFill = document.getElementById('usage-bar-fill');
+const usageStat = document.getElementById('usage-stat');
+const usagePausedNote = document.getElementById('usage-paused-note');
+const usageResetBtn = document.getElementById('usage-reset-btn');
 const passwordInput = document.getElementById('password-input');
 const loginBtn = document.getElementById('login-btn');
 const loginError = document.getElementById('login-error');
@@ -27,11 +32,39 @@ const selectedIds = new Set();
 
 function showLogin() {
   loginPanel.hidden = false;
+  usagePanel.hidden = true;
   dashboardPanel.hidden = true;
 }
 function showDashboard() {
   loginPanel.hidden = true;
+  usagePanel.hidden = false;
   dashboardPanel.hidden = false;
+}
+
+function renderUsage(status) {
+  const pct = status.limit ? Math.min(100, Math.round((status.count / status.limit) * 100)) : 0;
+  usageBarFill.style.width = `${pct}%`;
+  usageBarFill.classList.toggle('is-blocked', status.blocked);
+  usageBarFill.classList.toggle('is-warning', !status.blocked && status.count >= status.threshold * 0.85);
+  usageStat.textContent = `${status.count} / ${status.limit} analyses today (pauses at ${status.threshold})`;
+  if (status.blocked) {
+    const resetTime = new Date(status.resetAt).toLocaleString();
+    usagePausedNote.textContent = `⏸ Paused — new analyses are blocked until ${resetTime} (UTC reset).`;
+    usagePausedNote.hidden = false;
+  } else {
+    usagePausedNote.hidden = true;
+  }
+}
+
+async function loadUsage() {
+  try {
+    const res = await fetch(`${API_BASE}/admin-usage`);
+    if (!res.ok) return;
+    const data = await parseJsonResponse(res);
+    renderUsage(data);
+  } catch {
+    // Non-critical — the scan log itself still works without this.
+  }
 }
 
 function scoreLine(scan) {
@@ -113,6 +146,7 @@ async function loadLogs() {
   showDashboard();
   lastScans = data.scans;
   renderList();
+  loadUsage();
 }
 
 async function openDetail(id) {
@@ -224,6 +258,18 @@ deleteSelectedBtn.addEventListener('click', async () => {
   } finally {
     setSelectionMode(false);
     await loadLogs();
+  }
+});
+
+usageResetBtn.addEventListener('click', async () => {
+  if (!confirm('Reset today\'s analysis counter and resume immediately?')) return;
+  usageResetBtn.disabled = true;
+  try {
+    const res = await fetch(`${API_BASE}/admin-usage`, { method: 'POST' });
+    const data = await parseJsonResponse(res);
+    if (res.ok) renderUsage(data);
+  } finally {
+    usageResetBtn.disabled = false;
   }
 });
 

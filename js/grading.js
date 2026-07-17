@@ -18,7 +18,16 @@ export async function analyzeCard(payload) {
     body: JSON.stringify(payload),
   });
   const data = await parseJsonResponse(res);
-  if (!res.ok) throw new Error(data.error || 'Analyze request failed');
+  if (!res.ok) {
+    // `data.error` doubles as a machine-readable code (e.g. "quota_paused")
+    // when present alongside a friendlier `data.message` — callers that
+    // need to react to a specific failure (like stopping a batch early)
+    // can check err.code instead of pattern-matching the message text.
+    const err = new Error(data.message || data.error || 'Analyze request failed');
+    err.code = data.error;
+    err.resetAt = data.resetAt;
+    throw err;
+  }
   return data;
 }
 

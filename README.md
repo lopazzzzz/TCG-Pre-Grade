@@ -44,6 +44,25 @@ set `GEMINI_API_KEY` + a `PROXY_SECRET` (any long random string) as its
 environment variables. You'll need the resulting service URL and that same
 `PROXY_SECRET` for step 3 below.
 
+## 1.6. Daily analysis safety cap (optional but recommended)
+
+Cloudflare and Gemini's free tiers both stop working for free (no surprise
+charges) once you exceed them — but to avoid even *that* happening
+unexpectedly, the app tracks its own daily count of analysis calls and
+pauses itself (with a clear in-app message, not a raw API error) once usage
+crosses a threshold you set:
+
+- `DAILY_ANALYSIS_LIMIT` — your assumed daily free-tier request limit.
+  Defaults to `1000` if unset; check
+  [ai.google.dev/gemini-api/docs/rate-limits](https://ai.google.dev/gemini-api/docs/rate-limits)
+  for the current real number and set this to match.
+- `DAILY_ANALYSIS_THRESHOLD_PCT` — what % of that limit triggers the pause.
+  Defaults to `70` if unset.
+
+Both are plain (non-secret) environment variables. Usage resets at midnight
+UTC. The admin dashboard (`/admin.html`) shows a live usage bar and lets you
+manually reset the counter early if the assumed limit turns out to be wrong.
+
 ## 2. Set up the admin dashboard
 
 The app automatically logs every completed scan (card details, scores,
@@ -95,7 +114,9 @@ wrangler pages dev . --r2 SCAN_BUCKET \
   -b GEMINI_PROXY_URL=https://your-proxy.a.run.app/ \
   -b PROXY_SECRET=dev-secret \
   -b ADMIN_PASSWORD=your-password \
-  -b ADMIN_SESSION_SECRET=$(openssl rand -hex 32)
+  -b ADMIN_SESSION_SECRET=$(openssl rand -hex 32) \
+  -b DAILY_ANALYSIS_LIMIT=1000 \
+  -b DAILY_ANALYSIS_THRESHOLD_PCT=70
 ```
 
 The Gemini proxy itself can also run locally (see

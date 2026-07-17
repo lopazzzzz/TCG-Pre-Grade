@@ -57,6 +57,13 @@
   }
   .admin-detail__images { display: flex; gap: 10px; margin-bottom: 14px; }
   .admin-detail__images img { width: 50%; border-radius: var(--radius-sm); object-fit: contain; background: #000; }
+  .usage-panel__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; gap: 8px; }
+  .usage-bar { height: 10px; border-radius: 999px; background: var(--border); overflow: hidden; margin-bottom: 8px; }
+  .usage-bar__fill { height: 100%; background: var(--great); transition: width 0.3s ease, background 0.3s ease; }
+  .usage-bar__fill.is-warning { background: var(--fair); }
+  .usage-bar__fill.is-blocked { background: var(--poor); }
+  .usage-panel__stat { margin: 0; font-size: 0.88rem; color: var(--text-muted); }
+  .usage-panel__note { margin: 10px 0 0; font-size: 0.85rem; color: var(--poor); font-weight: 600; }
 </style>
 </head>
 <body>
@@ -78,6 +85,16 @@
     <input type="password" id="password-input" placeholder="Password" autocomplete="current-password">
     <button type="button" class="btn-primary" id="login-btn" style="width:100%">Log in</button>
     <p class="error" id="login-error" hidden></p>
+  </section>
+
+  <section class="panel" id="usage-panel" hidden>
+    <div class="usage-panel__header">
+      <h2 class="panel__title" style="margin:0">Daily Analysis Usage</h2>
+      <button type="button" class="btn-secondary btn-small" id="usage-reset-btn">Reset now</button>
+    </div>
+    <div class="usage-bar"><div class="usage-bar__fill" id="usage-bar-fill" style="width:0%"></div></div>
+    <p class="usage-panel__stat" id="usage-stat">-</p>
+    <p class="usage-panel__note" id="usage-paused-note" hidden></p>
   </section>
 
   <section class="panel" id="dashboard-panel" hidden>

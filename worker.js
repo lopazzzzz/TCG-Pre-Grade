@@ -8,6 +8,7 @@ import { onRequestPost as adminLogout } from './functions/api/admin-logout.js';
 import { onRequestGet as adminLogs } from './functions/api/admin-logs.js';
 import { onRequestGet as adminLog } from './functions/api/admin-log.js';
 import { onRequestPost as adminLogDelete } from './functions/api/admin-log-delete.js';
+import { onRequestGet as adminUsageGet, onRequestPost as adminUsagePost } from './functions/api/admin-usage.js';
 
 const ROUTES = {
   'POST /api/analyze-card': analyzeCard,
@@ -16,6 +17,8 @@ const ROUTES = {
   'GET /api/admin-logs': adminLogs,
   'GET /api/admin-log': adminLog,
   'POST /api/admin-log-delete': adminLogDelete,
+  'GET /api/admin-usage': adminUsageGet,
+  'POST /api/admin-usage': adminUsagePost,
 };
 
 export default {

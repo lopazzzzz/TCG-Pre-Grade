@@ -423,6 +423,7 @@ document.getElementById('analyze-btn').addEventListener('click', async () => {
   try {
     for (const card of readyCards) {
       if (card.lastResult) continue; // already analyzed — don't re-spend an API call
+      let quotaPaused = false;
       try {
         const frontOuter = card.front.centeringEditor.getBorders().outer;
         const backOuter = card.back.centeringEditor.getBorders().outer;
@@ -448,9 +449,16 @@ document.getElementById('analyze-btn').addEventListener('click', async () => {
         card.lastResult = await analyzeCard(payload);
         card.analyzeError = null;
       } catch (err) {
-        card.analyzeError = err.message || 'Analyze failed';
+        quotaPaused = err.code === 'quota_paused';
+        card.analyzeError = quotaPaused && err.resetAt
+          ? `${err.message} (resumes ${new Date(err.resetAt).toLocaleString()})`
+          : (err.message || 'Analyze failed');
       }
       renderCardTabs();
+      // The daily safety cap blocks every remaining card identically — stop
+      // immediately instead of burning a request per card to rediscover the
+      // same "paused" result each time.
+      if (quotaPaused) break;
     }
 
     renderActiveCard();

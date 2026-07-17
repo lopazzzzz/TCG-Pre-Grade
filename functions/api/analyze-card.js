@@ -1,5 +1,6 @@
 import { SYSTEM_PROMPT, buildUserText, parseGradingResponse, computeCompanyEstimates } from '../../lib/gradingPrompt.js';
 import { logScan } from '../../lib/scanLog.js';
+import { getQuotaStatus, recordAnalysis } from '../../lib/quota.js';
 
 const IMAGE_LABELS = [
   'front full', 'back full',
@@ -42,6 +43,22 @@ export async function onRequestPost({ request, env }) {
       return Response.json({ error: 'Server missing GEMINI_PROXY_URL/PROXY_SECRET' }, { status: 500 });
     }
 
+    // Self-enforced safety cap — stop making Gemini calls ourselves once
+    // usage crosses a configurable share (default 70%) of a configurable
+    // assumed daily free-tier limit, rather than relying on a billing
+    // alert email that could go unnoticed. This is a personal-use safety
+    // margin, not a precise mirror of Google's actual quota accounting.
+    const quota = await getQuotaStatus(env);
+    if (quota.blocked) {
+      return Response.json({
+        error: 'quota_paused',
+        message: `Daily analysis limit reached (${quota.count}/${quota.limit}) — pre-grading is paused until it resets.`,
+        resetAt: quota.resetAt,
+        count: quota.count,
+        limit: quota.limit,
+      }, { status: 429 });
+    }
+
     const parts = [
       { text: buildUserText({ game, cardName, setName, cardNumber, centeringFrontRatio, centeringBackRatio }) },
     ];
@@ -66,6 +83,15 @@ export async function onRequestPost({ request, env }) {
     // The proxy forwards Gemini's response (including its exact status
     // code and error shape) unchanged, so the handling below is identical
     // to calling Gemini directly.
+    //
+    // Counted here (right before the call), not only on success — a
+    // request that reaches Gemini spends its quota regardless of whether
+    // Gemini's own response is an error.
+    try {
+      await recordAnalysis(env);
+    } catch (quotaErr) {
+      console.error('quota tracking write failed', quotaErr);
+    }
     const res = await fetch(proxyUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-proxy-secret': proxySecret },
